@@ -4,6 +4,20 @@
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 
+Lenia::Animal::Animal(const AnimalInfo &info, const u8 scale) :
+    m_info(info),
+    m_scale(scale),
+    m_kernelBuffer(Buffer<f32>(BufferBinding::KERNEL, (2 * m_info.m_r * m_scale + 1) * (2 * m_info.m_r * m_scale + 1))) {
+    computeKernel();
+    computeCellTexture();
+}
+
+Lenia::Animal::~Animal() noexcept {
+    glDeleteTextures(1, &m_kernelTexture);
+    glDeleteTextures(1, &m_paddedKernelTexture);
+    glDeleteTextures(1, &m_fftKernelTexture);
+}
+
 void Lenia::Animal::computeFFTKernel(const std::size_t w) noexcept {
     cufftHandle normal;
     cufftPlan2d(&normal, w, w, CUFFT_C2C);

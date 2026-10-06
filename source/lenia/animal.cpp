@@ -9,20 +9,6 @@
 #undef min
 #undef max
 
-Lenia::Animal::Animal(const AnimalInfo &info, const u8 scale) : 
-	m_info(info), 
-	m_scale(scale), 
-	m_kernelBuffer(Buffer<f32>(BufferBinding::KERNEL, (2 * m_info.m_r * m_scale + 1) * (2 * m_info.m_r * m_scale + 1))) {
-	computeKernel();
-	computeCellTexture();
-}
-
-Lenia::Animal::~Animal() noexcept {
-	glDeleteTextures(1, &m_kernelTexture);
-	glDeleteTextures(1, &m_paddedKernelTexture);
-	glDeleteTextures(1, &m_fftKernelTexture);
-}
-
 void Lenia::Animal::resize(const u8 scale) {
 	m_scale = scale;
 	m_kernelBuffer.m_data.resize((2 * m_info.m_r * scale + 1) * (2 * m_info.m_r * scale + 1));

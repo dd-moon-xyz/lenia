@@ -25,6 +25,14 @@ cmake --fresh -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --target lenia --parallel
 ```
 
+Run the compilation test from the project root after configuring:
+
+```bash
+ctest --test-dir build -R '^compilation$' --output-on-failure --no-tests=error
+```
+
+The test performs a clean parallel rebuild of both `lenia` and `leniadb`.
+
 ## Run
 
 From the project root:
@@ -39,7 +47,7 @@ Run inside `build/`: fonts, animal data, and shaders are loaded through `../reso
 
 The `lenia` target builds the visualization without the separate debug executable and assembly-generation targets. The `compilation` CTest test rebuilds `lenia` and `leniadb` with `--clean-first --parallel` and runs separately from other tests. The [GitHub Actions workflow](../.github/workflows/compilation.yml) runs this test on every push using Ubuntu 24.04, GCC 11, and the distribution's CUDA Toolkit. Compilation does not require a GPU or graphical display.
 
-CMake tests the default `g++`, then installed versioned `g++-*` executables on `PATH`, by compiling a small CUDA C++20 source. It selects the first compiler that passes for both C++ and CUDA host code. No compiler version or installation path is hardcoded.
+CMake tests the default `g++`, then installed versioned `g++-*` executables on `PATH`, by compiling a small CUDA C++20 source. It selects the first compiler that passes for both C++ and CUDA host code. No compiler version or installation path is hardcoded. The `Animal` constructor and destructor are defined in `animal.cu` so NVCC compiles the lifecycle operations for its Thrust device vector.
 
 If no installed compiler passes, configuration stops with an explanation and the path to the probe log. Install a compiler supported by your Toolkit or upgrade the Toolkit. CUDA does not support every GCC version; see NVIDIA’s [host compiler requirements](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#host-compiler-support-policy).
 
