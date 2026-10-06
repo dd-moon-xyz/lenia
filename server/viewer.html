@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lenia stream</title>
+<style>
+body { background: #171717; color: #eee; font: 16px sans-serif; max-width: 760px; margin: 24px auto; padding: 0 16px; }
+textarea { width: 100%; height: 200px; box-sizing: border-box; }
+canvas { width: 100%; background: black; }
+button, select { margin: 8px 8px 8px 0; padding: 8px; }
+</style>
+<h1>Lenia stream</h1>
+<label>Organism <select id="organism"></select></label>
+<textarea id="config" aria-label="Simulation configuration"></textarea>
+<button id="start">Start / restart</button><button id="pause">Pause</button><button id="stop">Stop</button>
+<p id="status">Ready</p>
+<canvas id="canvas" width="512" height="512"></canvas>
+<script>
+const config = document.querySelector('#config');
+const status = document.querySelector('#status');
+const canvas = document.querySelector('#canvas');
+const context = canvas.getContext('2d');
+const select = document.querySelector('#organism');
+config.value = JSON.stringify({action: 'start', size: 512, fps: 20, dt: 0.1,
+  organisms: [{type: 0, scale: 1, x: 128, y: 128}, {type: 0, scale: 1, x: 320, y: 320}]}, null, 2);
+let socket, paused = false, pending = false, circular = false, spaceHeld = false;
+fetch('/organisms').then(response => response.json()).then(items => {
+  for (const item of items) select.add(new Option(item.name, item.type));
+}).catch(error => status.textContent = error.message);
+select.onchange = () => {
+  try {
+    const data = JSON.parse(config.value);
+    data.organisms.forEach(item => item.type = Number(select.value));
+    config.value = JSON.stringify(data, null, 2);
+  } catch (error) { status.textContent = error.message; }
+};
+function requestFrame() {
+  if (socket?.readyState === WebSocket.OPEN && !paused && !pending) {
+    pending = true;
+    socket.send('next');
+  }
+}
+document.querySelector('#start').onclick = () => {
+  let data;
+  try { data = JSON.parse(config.value); } catch (error) { status.textContent = error.message; return; }
+  if (socket && socket.readyState !== WebSocket.CLOSED) {
+    const previous = socket;
+    previous.onclose = () => { if (socket === previous) { socket = null; document.querySelector('#start').click(); } };
+    previous.close();
+    return;
+  }
+  paused = false; pending = false;
+  document.querySelector('#pause').textContent = 'Pause';
+  const connection = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  socket = connection;
+  circular = data.boundary === 'circle';
+  connection.binaryType = 'blob';
+  status.textContent = 'Starting…';
+  connection.onopen = () => connection.send(JSON.stringify(data));
+  connection.onmessage = async event => {
+    if (connection !== socket) return;
+    if (typeof event.data === 'string') {
+      const message = JSON.parse(event.data);
+      status.textContent = message.error || message.status;
+      if (message.status === 'started') {
+        canvas.width = canvas.height = message.size;
+        requestFrame();
+      }
+      return;
+    }
+    try {
+      const bitmap = await createImageBitmap(event.data);
+      context.drawImage(bitmap, 0, 0);
+      bitmap.close();
+      pending = false;
+      requestFrame();
+    } catch (error) { status.textContent = error.message; connection.close(); }
+  };
+  connection.onerror = () => status.textContent = 'Connection failed';
+  connection.onclose = () => { if (status.textContent === 'started') status.textContent = 'Disconnected'; };
+};
+document.querySelector('#pause').onclick = event => {
+  paused = !paused;
+  event.target.textContent = paused ? 'Resume' : 'Pause';
+  if (!paused) requestFrame();
+};
+document.querySelector('#stop').onclick = () => { socket?.close(); status.textContent = 'Stopped'; };
+function steer(outward) {
+  spaceHeld = outward;
+  if (socket?.readyState === WebSocket.OPEN && circular) socket.send(outward ? 'outward' : 'inward');
+}
+document.addEventListener('keydown', event => {
+  if (event.code !== 'Space' || event.repeat || ['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(event.target.tagName)) return;
+  if (socket?.readyState === WebSocket.OPEN && circular) {
+    event.preventDefault();
+    steer(true);
+  }
+});
+document.addEventListener('keyup', event => {
+  if (event.code === 'Space' && spaceHeld) {
+    event.preventDefault();
+    steer(false);
+  }
+});
+window.addEventListener('blur', () => { if (spaceHeld) steer(false); });
+</script>
+</html>

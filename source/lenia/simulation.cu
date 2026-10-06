@@ -20,9 +20,9 @@ __device__ f32 growth(const f32 f, const f32 mu, const f32 sigma)
     return pow(max(0.0f, 1.0f - (diff * diff) / (9.0f * sigma * sigma)), 4.0f) * 2.0f - 1.0f;
 }
 
-__device__ Lenia::c64 leniastep(Lenia::c64 resultField, Lenia::c64 inv, f32 norm, f32 dt, f32 mu, f32 sigma)
+__device__ Lenia::c64 leniastep(Lenia::c64 resultField, Lenia::c64 inv, f32 norm, f32 dt, f32 mu, f32 sigma, f32 maximumState)
 {
-    f32 val = min(max(resultField.x + dt * growth(inv.x * norm, mu, sigma), 0.f), 1.f);
+    f32 val = min(max(resultField.x + dt * growth(inv.x * norm, mu, sigma), 0.f), maximumState);
     return {val, 0.f};
 }
 
@@ -33,7 +33,8 @@ __global__ static void fftshiftFast(
     f32 norm,
     f32 dt,
     f32 mu,
-    f32 sigma)
+    f32 sigma,
+    f32 maximumState)
 {
 
     i32 sEq1 = (N * N + N) / 2;
@@ -48,8 +49,8 @@ __global__ static void fftshiftFast(
     {
         if (yIndex < N / 2)
         {
-            const Lenia::c64 top_left = leniastep(resultField[index], inv[index + sEq1], norm, dt, mu, sigma);
-            const Lenia::c64 bottom_right = leniastep(resultField[index + sEq1], inv[index], norm, dt, mu, sigma);
+            const Lenia::c64 top_left = leniastep(resultField[index], inv[index + sEq1], norm, dt, mu, sigma, maximumState);
+            const Lenia::c64 bottom_right = leniastep(resultField[index + sEq1], inv[index], norm, dt, mu, sigma, maximumState);
             resultField[index] = top_left;
             resultField[index + sEq1] = bottom_right;
         }
@@ -58,8 +59,8 @@ __global__ static void fftshiftFast(
     {
         if (yIndex < N / 2)
         {
-            const Lenia::c64 top_right = leniastep(resultField[index], inv[index + sEq2], norm, dt, mu, sigma);
-            const Lenia::c64 bottom_left = leniastep(resultField[index + sEq2], inv[index], norm, dt, mu, sigma);
+            const Lenia::c64 top_right = leniastep(resultField[index], inv[index + sEq2], norm, dt, mu, sigma, maximumState);
+            const Lenia::c64 bottom_left = leniastep(resultField[index + sEq2], inv[index], norm, dt, mu, sigma, maximumState);
             resultField[index] = top_right;
             resultField[index + sEq2] = bottom_left;
         }
@@ -68,6 +69,7 @@ __global__ static void fftshiftFast(
 
 void Lenia::Simulation::loadFFT() noexcept
 {
+    glFinish();
     f32 *buffer_gpu;
     cudaMalloc(&buffer_gpu, m_size * sizeof(f32));
     cudaMemcpy(buffer_gpu, m_readBuffer.m_data.data(), m_size * sizeof(f32), cudaMemcpyHostToDevice);
@@ -205,7 +207,7 @@ void Lenia::Simulation::clearPersistentBuffer() noexcept
     }
 }
 
-void Lenia::Simulation::stepLayer(c64 *layerResult, const std::size_t fftOffset, const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma) noexcept
+void Lenia::Simulation::stepLayer(c64 *layerResult, const std::size_t fftOffset, const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma, const f32 maximumState) noexcept
 {
     using namespace thrust::placeholders;
 
@@ -225,10 +227,11 @@ void Lenia::Simulation::stepLayer(c64 *layerResult, const std::size_t fftOffset,
         m_norm,
         dt,
         mu,
-        sigma);
+        sigma,
+        maximumState);
 }
 
-void Lenia::Simulation::updateFFT(const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma) noexcept
+void Lenia::Simulation::updateFFT(const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma, const f32 maximumState) noexcept
 {
     using namespace thrust::placeholders;
 
@@ -254,7 +257,7 @@ void Lenia::Simulation::updateFFT(const Lenia::c64 *animalKernel, const f32 dt, 
         stepLayer(m_worldResult, worldFFTOffset, animalKernel, dt, mu, sigma);
     }
 
-    stepLayer(m_fragBuffer, playerFFTOffset, animalKernel, dt, mu, sigma);
+    stepLayer(m_fragBuffer, playerFFTOffset, animalKernel, dt, mu, sigma, maximumState);
 
     if (m_layerFlags & LAYER_ID::WORLD)
     {
@@ -346,8 +349,8 @@ void Lenia::Simulation::clearCells() noexcept
 {
     std::fill(m_readBuffer.m_data.begin(), m_readBuffer.m_data.end(), 0.f);
     std::fill(m_writeBuffer.m_data.begin(), m_writeBuffer.m_data.end(), 0.f);
-    m_readBuffer.storeDataInShader();
-    m_writeBuffer.storeDataInShader();
+    glNamedBufferSubData(m_readBuffer.m_ID, 0, m_readBuffer.m_data.size() * sizeof(f32), m_readBuffer.m_data.data());
+    glNamedBufferSubData(m_writeBuffer.m_ID, 0, m_writeBuffer.m_data.size() * sizeof(f32), m_writeBuffer.m_data.data());
     cudaMemset(m_fragBuffer, 0, m_size * sizeof(c64));
     cudaMemset(m_worldResult, 0, m_size * sizeof(c64));
 }

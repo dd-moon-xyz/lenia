@@ -43,13 +43,15 @@ Lenia::Simulation::Simulation(const size_t w, const size_t h, const size_t scale
 	cudaGraphicsResourceGetMappedPointer((void**)&m_fragBuffer, &m_numBytesField, m_cudaGraphicsResource);
 	cufftPlan2d(&m_plan, m_w, m_h, CUFFT_C2C);
 	allocBuffers();
-	m_readBuffer.storeDataInShader();
-	m_writeBuffer.storeDataInShader();
+	glNamedBufferSubData(m_readBuffer.m_ID, 0, m_readBuffer.m_data.size() * sizeof(f32), m_readBuffer.m_data.data());
+	glNamedBufferSubData(m_writeBuffer.m_ID, 0, m_writeBuffer.m_data.size() * sizeof(f32), m_writeBuffer.m_data.data());
 }
 
 Lenia::Simulation::~Simulation() noexcept {
 	cudaGraphicsUnmapResources(1, &m_cudaGraphicsResource);
 	cudaGraphicsUnmapResources(1, &m_cudaLayerDataResource);
+	cudaGraphicsUnregisterResource(m_cudaGraphicsResource);
+	cudaGraphicsUnregisterResource(m_cudaLayerDataResource);
 	cufftDestroy(m_plan);
 	freeBuffers();
 }
@@ -63,7 +65,7 @@ void Lenia::Simulation::placeCells(const std::vector<f32> &cells, const size_t c
 	for (size_t l = 0; l < m_scale; l++) {
 		m_readBuffer[(y + i * m_scale + k) % m_h * m_w + (x + j * m_scale + l) % m_w] = cells[i * c_w + j];
 	}
-	m_readBuffer.storeDataInShader();
+	glNamedBufferSubData(m_readBuffer.m_ID, 0, m_readBuffer.m_data.size() * sizeof(f32), m_readBuffer.m_data.data());
 }
 
 void Lenia::Simulation::processLayerInfo() noexcept {
@@ -74,9 +76,13 @@ void Lenia::Simulation::processLayerInfo() noexcept {
 	m_direction = normalizeOrZero(movement);
 }
 
-void Lenia::Simulation::update(const Animal &animal, const f32 dt) noexcept {
-	updateFFT(thrust::raw_pointer_cast(animal.m_GPUfftKernel.data()), dt, animal.m_info.m_mu, animal.m_info.m_sigma);
+void Lenia::Simulation::update(const Animal &animal, const f32 dt, const f32 maximumState) noexcept {
+	updateFFT(thrust::raw_pointer_cast(animal.m_GPUfftKernel.data()), dt, animal.m_info.m_mu, animal.m_info.m_sigma, maximumState);
 	processLayerInfo();
+}
+
+void Lenia::Simulation::bindField() const noexcept {
+	glBindBufferBase(GL_SHADER_STORAGE_BUFFER, 1, m_readBuffer.m_ID);
 }
 
 

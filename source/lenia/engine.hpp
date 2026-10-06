@@ -13,6 +13,7 @@
 namespace Lenia {
 
     class Engine {
+        friend class StreamArena;
 
         enum DrawMode {
             NONE, 
@@ -30,7 +31,11 @@ namespace Lenia {
             explicit Engine() noexcept;
             explicit Engine(const u32 w, const u32 h, const u8 scale) noexcept;
             explicit Engine(const u32 w, const u32 h, const u8 scale, const f32 dtOverride) noexcept;
-            explicit Engine(const u32 winW, const u32 winH, const u32 simW, const u32 simH, const u8 scale, const f32 dtOverride) noexcept;
+            explicit Engine(const u32 winW, const u32 winH, const u32 simW, const u32 simH, const u8 scale, const f32 dtOverride, const bool streaming = false) noexcept;
+            void configureStream(const std::size_t animalIdx, const std::vector<glm::uvec2>& positions, const bool centered = false);
+            std::vector<u8> streamFrame();
+            glm::vec2 streamDirection() const noexcept;
+            f32 streamMass() const noexcept;
             ~Engine() noexcept;
             [[nodiscard]] bool shouldRun() const noexcept;
             void update() noexcept;
@@ -67,6 +72,7 @@ namespace Lenia {
             u32 count = 0;
 
             bool m_paused = false;
+            bool m_streaming = false;
             bool m_showInfo = false;
             bool m_showBoundingBoxes = false;
             bool m_showGrid = true;

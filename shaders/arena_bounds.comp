@@ -1,0 +1,20 @@
+#version 430
+layout(local_size_x = 256) in;
+layout(std430, binding = 1) readonly buffer field { vec2 cells[]; };
+layout(std430, binding = 5) buffer bounds {
+    int left; int top; int right; int bottom;
+};
+layout(location = 0) uniform int size;
+layout(location = 1) uniform vec2 center;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= uint(size * size) || cells[index].x <= 0.02) return;
+    vec2 delta = vec2(index % uint(size), index / uint(size)) - center;
+    delta -= round(delta / float(size)) * float(size);
+    ivec2 point = ivec2(floor(delta + float(size) * 0.5));
+    atomicMin(left, point.x);
+    atomicMin(top, point.y);
+    atomicMax(right, point.x);
+    atomicMax(bottom, point.y);
+}

@@ -28,12 +28,13 @@ Lenia::Engine::Engine(const u32 w, const u32 h, const u8 scale) noexcept :
 Lenia::Engine::Engine(const u32 w, const u32 h, const u8 scale, const f32 dtOverride) noexcept :
     Engine(w, h, w, h, scale, dtOverride) {}
 
-Lenia::Engine::Engine(const u32 winW, const u32 winH, const u32 simW, const u32 simH, const u8 scale, const f32 dtOverride) noexcept :
+Lenia::Engine::Engine(const u32 winW, const u32 winH, const u32 simW, const u32 simH, const u8 scale, const f32 dtOverride, const bool streaming) noexcept :
     m_windowWidth(winW),
     m_windowHeight(winH),
     m_simWidth(simW),
     m_simHeight(simH),
     m_scale(scale),
+    m_streaming(streaming),
     m_colorBuffer(),
     m_dtOverride(dtOverride > 0.f ? std::optional<f32>{dtOverride} : std::nullopt) {
     initGL();
@@ -62,15 +63,18 @@ Lenia::Engine::Engine(const u32 winW, const u32 winH, const u32 simW, const u32 
 }
 
 Lenia::Engine::~Engine() noexcept {
+    m_simulation.reset();
+    m_currentAnimal.reset();
+    m_colorBuffer.reset();
     glDeleteVertexArrays(1, &m_VAO);
     glDeleteProgram(m_shaderProgram);
     glDeleteProgram(m_computeProgram);
     glDeleteBuffers(1, &m_VBO);
-    glfwDestroyWindow(m_window);
-    glfwTerminate();
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
+    glfwDestroyWindow(m_window);
+    glfwTerminate();
 }
 
 const std::vector<Lenia::AnimalInfo>& Lenia::Engine::getAnimalInfo() const noexcept {
@@ -89,9 +93,15 @@ void Lenia::Engine::initGL() noexcept {
         std::cerr << "Failed to initialize GLFW" << std::endl;
         exit(-1);
     }
+    if (m_streaming) {
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    }
     m_window = glfwCreateWindow(m_windowWidth, m_windowHeight, "", NULL, NULL);
     if (!m_window) {
+        std::cerr << "Failed to create OpenGL window" << std::endl;
         glfwTerminate();
+        exit(-1);
     }
 
     u8* const pixels = stbi_load("../resources/lenia.png", &width, &height, &channels, 4);
@@ -432,6 +442,47 @@ void Lenia::Engine::reset() noexcept {
 
 [[nodiscard]] bool Lenia::Engine::shouldRun() const noexcept {
     return !glfwWindowShouldClose(m_window);
+}
+
+void Lenia::Engine::configureStream(const std::size_t animalIdx, const std::vector<glm::uvec2>& positions, const bool centered) {
+    m_animalIdx = animalIdx;
+    m_currentAnimal = std::make_unique<Animal>(m_animals.at(animalIdx), m_scale);
+    m_currentAnimal->computePadded(m_simWidth);
+    m_simulation->clearCells();
+    const auto cells = m_currentAnimal->getCells();
+    for (const auto& position : positions) {
+        m_simulation->placeCells(cells, m_currentAnimal->m_info.m_w, m_currentAnimal->m_info.m_h, position.x, position.y);
+    }
+    m_simulation->loadFFT();
+    m_showGrid = false;
+    m_showCenterOfMass = false;
+    m_focusMode = centered;
+    if (centered) {
+        m_infoPanelState->shadersEnabled = false;
+    }
+}
+
+f32 Lenia::Engine::streamMass() const noexcept {
+    return static_cast<f32>(m_simulation->m_mass);
+}
+
+glm::vec2 Lenia::Engine::streamDirection() const noexcept {
+    return m_simulation->m_direction;
+}
+
+std::vector<u8> Lenia::Engine::streamFrame() {
+    glfwPollEvents();
+    glViewport(0, 0, m_simWidth, m_simHeight);
+    m_simulation->update(*m_currentAnimal, getCurrentDt());
+    glClear(GL_COLOR_BUFFER_BIT);
+    updateGL();
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, ce_indices);
+    std::vector<u8> pixels(m_simWidth * m_simHeight * 3);
+    glReadBuffer(GL_BACK);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glReadPixels(0, 0, m_simWidth, m_simHeight, GL_RGB, GL_UNSIGNED_BYTE, pixels.data());
+    count++;
+    return pixels;
 }
 
 void Lenia::Engine::update() noexcept {

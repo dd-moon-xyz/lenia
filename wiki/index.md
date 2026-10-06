@@ -12,6 +12,7 @@ Project documentation organized as an Open Knowledge Format (OKF) v0.2 bundle.
 - [Project overview](../README.md)
 - [Controls](controls.md)
 - [Example animals](examples.md)
+- [Available organisms](organisms.md)
 - [Technical overview](architecture.md)
 - [Mathematical background](mathematics.md)
 - [Python experiments](python-experiments.md)

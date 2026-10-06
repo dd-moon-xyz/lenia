@@ -6,3 +6,4 @@ resources/figs
 __pycache__/
 *.mp4
 *.claude
+uv.lock/

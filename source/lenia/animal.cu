@@ -14,6 +14,7 @@ Lenia::Animal::Animal(const AnimalInfo &info, const u8 scale) :
 
 Lenia::Animal::~Animal() noexcept {
     glDeleteTextures(1, &m_kernelTexture);
+    glDeleteTextures(1, &m_cellTexture);
     glDeleteTextures(1, &m_paddedKernelTexture);
     glDeleteTextures(1, &m_fftKernelTexture);
 }

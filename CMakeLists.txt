@@ -94,6 +94,12 @@ target_link_libraries(leniadb PRIVATE
 )
 
 if(BUILD_TESTING)
+    add_executable(stream_motion_test tests/stream_motion.cpp)
+    set_target_properties(stream_motion_test PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS OFF)
+    target_link_libraries(stream_motion_test PRIVATE glm)
+    target_include_directories(stream_motion_test PRIVATE source/lenia)
+    add_test(NAME stream_motion COMMAND stream_motion_test)
+
     add_test(NAME compilation
         COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR}
             --clean-first --target lenia leniadb --config $<CONFIG> --parallel

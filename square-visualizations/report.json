@@ -1,0 +1,181 @@
+{
+  "settings": {
+    "first": 0,
+    "last": 20,
+    "jobs": 12,
+    "frames": 600,
+    "sample_every": 30,
+    "size": 1024,
+    "scale": null,
+    "edge_coverage": 0.6,
+    "output": "/home/bastian/projects/lenia/square-visualizations"
+  },
+  "matches": [],
+  "results": [
+    {
+      "type": 0,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 1,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 2,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 3,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 4,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 5,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 6,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 7,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        2
+      ]
+    },
+    {
+      "type": 8,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        2
+      ]
+    },
+    {
+      "type": 9,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 10,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 11,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 12,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 13,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 14,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 15,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 16,
+      "status": "skipped",
+      "reason": "unsupported kernel/growth rule"
+    },
+    {
+      "type": 17,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        1
+      ]
+    },
+    {
+      "type": 18,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 19,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        3
+      ]
+    },
+    {
+      "type": 20,
+      "status": "no_match",
+      "matches": [],
+      "scales": [
+        2
+      ]
+    }
+  ]
+}
