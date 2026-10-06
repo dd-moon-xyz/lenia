@@ -2,9 +2,11 @@ cmake_minimum_required(VERSION 3.24)
 cmake_policy(VERSION 3.24)
 
 
-set(CMAKE_CUDA_FLAGS_INIT "--allow-unsupported-compiler")
+include(cmake/select_cuda_host.cmake)
 
 project(Lenia LANGUAGES C CUDA CXX)
+
+include(CTest)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,8 +23,6 @@ set(GLM_ENABLE_LANG_EXTENSIONS ON)
 set(GLFW_LIBRARY_TYPE STATIC)
 
 set(CMAKE_CUDA_SEPARABLE_COMPILATION ON)
-
-add_compile_definitions(NOMINMAX)
 
 set(CMAKE_CUDA_ARCHITECTURES 61)
 
@@ -58,11 +58,6 @@ set(LENIA_CUDA_COMMON_OPTIONS
     221,20012
 )
 
-set(LENIA_CUDA_MSVC_HOST_OPTIONS
-    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CXX_COMPILER_ID:MSVC>>:-Xcompiler=/arch:AVX512>
-    $<$<AND:$<COMPILE_LANGUAGE:CUDA>,$<CXX_COMPILER_ID:MSVC>>:-Xcompiler=/Zc:preprocessor>
-)
-
 add_executable(lenia ${SOURCES} ${KERNELS})
 target_include_directories(lenia PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 target_compile_definitions(lenia PRIVATE
@@ -70,11 +65,8 @@ target_compile_definitions(lenia PRIVATE
 )
 target_compile_options(lenia PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<CONFIG:Release>>:/O2 /arch:AVX512 /W2 /MP /GL /Zc:preprocessor>
-    $<$<AND:$<CXX_COMPILER_ID:MSVC>,$<NOT:$<CONFIG:Release>>>:/Od /arch:AVX512 /W2 /MP /Zc:preprocessor>
     $<$<CXX_COMPILER_ID:GNU>:-Ofast -march=native -Wall -Wextra -Werror -funroll-loops>
     >
-    ${LENIA_CUDA_MSVC_HOST_OPTIONS}
     $<$<COMPILE_LANGUAGE:CUDA>:${LENIA_CUDA_COMMON_OPTIONS}>
     $<$<COMPILE_LANGUAGE:CUDA>:--ptxas-options=-O3>
 )
@@ -83,7 +75,6 @@ target_link_libraries(lenia
     glfw
     glm
 )
-set(CMAKE_RC_COMPILER= "C:/Program Files (x86)/Windows Kits/10/bin/10.0.26100.0/x64/rc.exe")
 
 add_executable(leniadb ${SOURCES} ${KERNELS})
 target_include_directories(leniadb PRIVATE ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
@@ -92,10 +83,8 @@ target_compile_definitions(leniadb PRIVATE
 )
 target_compile_options(leniadb PRIVATE
     $<$<COMPILE_LANGUAGE:CXX>:
-    $<$<CXX_COMPILER_ID:MSVC>:/Od /arch:AVX512 /W0 /MP>
     $<$<CXX_COMPILER_ID:GNU>:-Og -march=native -Wall -Wextra>
     >
-    ${LENIA_CUDA_MSVC_HOST_OPTIONS}
     $<$<COMPILE_LANGUAGE:CUDA>:${LENIA_CUDA_COMMON_OPTIONS}>
 )
 target_link_libraries(leniadb PRIVATE
@@ -104,39 +93,41 @@ target_link_libraries(leniadb PRIVATE
     cufft
 )
 
-if(WIN32 AND NOT MSVC)
-    target_link_libraries(lenia PRIVATE gdi32)
-    target_link_libraries(leniadb PRIVATE gdi32)
+if(BUILD_TESTING)
+    add_test(NAME compilation
+        COMMAND ${CMAKE_COMMAND} --build ${PROJECT_BINARY_DIR}
+            --clean-first --target lenia leniadb --config $<CONFIG> --parallel
+    )
+
+    set_tests_properties(compilation PROPERTIES RUN_SERIAL TRUE)
 endif()
 
-if(NOT MSVC)
-    add_custom_command(TARGET lenia POST_BUILD
-        COMMAND ${CMAKE_STRIP} $<TARGET_FILE:lenia>
-        COMMENT "Stripping lenia..."
-    )
-    add_custom_target(assembly ALL COMMENT "Generating assembly for all source files")
+add_custom_command(TARGET lenia POST_BUILD
+    COMMAND ${CMAKE_STRIP} $<TARGET_FILE:lenia>
+    COMMENT "Stripping lenia..."
+)
+add_custom_target(assembly ALL COMMENT "Generating assembly for all source files")
 
-    foreach(SOURCE_FILE ${SOURCES})
-        get_filename_component(FILE_NAME ${SOURCE_FILE} NAME_WE)
-        add_custom_command(
-            OUTPUT ${PROJECT_BINARY_DIR}/assembly/${FILE_NAME}.s
-            COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/assembly
-            COMMAND ${CMAKE_CXX_COMPILER} -S -std=c++20 -Ofast -mavx512f -Wall -Wextra -fverbose-asm -masm=intel
-            -I${PROJECT_SOURCE_DIR}/source/stb -I${PROJECT_SOURCE_DIR}/source/imgui
-            -I${PROJECT_SOURCE_DIR}/source/imgui/backends -I${PROJECT_SOURCE_DIR}/source/glad
-            -I${PROJECT_SOURCE_DIR}/source/glfw/include -I${PROJECT_SOURCE_DIR}/source/glm
-            ${SOURCE_FILE} -o ${PROJECT_BINARY_DIR}/assembly/${FILE_NAME}.s
-            DEPENDS ${SOURCE_FILE}
-            COMMENT "Generating assembly for ${FILE_NAME}"
-        )
-        add_custom_target(${FILE_NAME}_asm DEPENDS ${PROJECT_BINARY_DIR}/assembly/${FILE_NAME}.s)
-        add_dependencies(assembly ${FILE_NAME}_asm)
-    endforeach()
-
-    add_custom_target(disassemble
-        COMMAND ${CMAKE_COMMAND} -E echo "Disassembling the executable..."
-        COMMAND objdump -dC ${CMAKE_BINARY_DIR}/lenia.exe > ${CMAKE_BINARY_DIR}/lenia.asm
-        DEPENDS lenia
-        COMMENT "Generating assembly for the fully linked executable"
+foreach(SOURCE_FILE ${SOURCES})
+    get_filename_component(FILE_NAME ${SOURCE_FILE} NAME_WE)
+    add_custom_command(
+        OUTPUT ${PROJECT_BINARY_DIR}/assembly/${FILE_NAME}.s
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${PROJECT_BINARY_DIR}/assembly
+        COMMAND ${CMAKE_CXX_COMPILER} -S -std=c++20 -Ofast -mavx512f -Wall -Wextra -fverbose-asm -masm=intel
+        -I${PROJECT_SOURCE_DIR}/source/stb -I${PROJECT_SOURCE_DIR}/source/imgui
+        -I${PROJECT_SOURCE_DIR}/source/imgui/backends -I${PROJECT_SOURCE_DIR}/source/glad
+        -I${PROJECT_SOURCE_DIR}/source/glfw/include -I${PROJECT_SOURCE_DIR}/source/glm
+        ${SOURCE_FILE} -o ${PROJECT_BINARY_DIR}/assembly/${FILE_NAME}.s
+        DEPENDS ${SOURCE_FILE}
+        COMMENT "Generating assembly for ${FILE_NAME}"
     )
-endif()
+    add_custom_target(${FILE_NAME}_asm DEPENDS ${PROJECT_BINARY_DIR}/assembly/${FILE_NAME}.s)
+    add_dependencies(assembly ${FILE_NAME}_asm)
+endforeach()
+
+add_custom_target(disassemble
+    COMMAND ${CMAKE_COMMAND} -E echo "Disassembling the executable..."
+    COMMAND objdump -dC $<TARGET_FILE:lenia> > ${CMAKE_BINARY_DIR}/lenia.asm
+    DEPENDS lenia
+    COMMENT "Generating assembly for the fully linked executable"
+)
