@@ -32,7 +32,7 @@ class SimulationWorker:
 
     async def start(self) -> None:
         if self.config.boundary == "circle":
-            header = f"{self.config.size} {self.config.fps} {self.config.dt} {len(self.config.organisms)}\n"
+            header = f"{self.config.size} {self.config.fps} {self.config.dt} {self.config.space_speed_multiplier} {len(self.config.organisms)}\n"
             organisms = "".join(f"{self.organism_line(item)}\n" for item in self.config.organisms)
         else:
             first = self.config.organisms[0]
@@ -68,9 +68,9 @@ class SimulationWorker:
             self.process.stdin.write(command.encode())
             await self.ready()
 
-    async def redirect(self, outward: bool) -> None:
+    async def redirect(self, outward: bool, boosted: bool = False) -> None:
         async with self.lock:
-            self.process.stdin.write(b"o" if outward else b"i")
+            self.process.stdin.write(b"o" if outward else (b"b" if boosted else b"i"))
             await self.ready()
 
     async def close(self) -> None:

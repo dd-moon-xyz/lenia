@@ -20,8 +20,7 @@ void main() {
     float radius = (float(worldSize) * 0.5 - 8.0) * 0.9;
     float distance = length(point - vec2(float(worldSize) * 0.5));
     if (background) {
-        fragColor = distance <= radius && distance >= radius - 2.0
-            ? vec4(vec3(100.0, 150.0, 190.0) / 255.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0);
+        fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
     if (distance > radius - 2.0) discard;

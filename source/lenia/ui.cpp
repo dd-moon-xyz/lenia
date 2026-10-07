@@ -179,7 +179,7 @@ void Lenia::UI::infoPanel(f64 updatetime, const Simulation &sim, const Animal &a
     }
 
     if (ImGui::CollapsingHeader("Color Palette", ImGuiTreeNodeFlags_DefaultOpen)) {
-        const char* paletteNames[] = { "Magma", "Greyscale" };
+        const char* paletteNames[] = { "Magma", "Greyscale", "Ocean", "Aurora", "Ember", "Ice" };
         state.paletteChanged = ImGui::Combo("Palette", &state.paletteIndex, paletteNames, IM_ARRAYSIZE(paletteNames));
     }
 

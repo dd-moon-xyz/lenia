@@ -29,9 +29,9 @@ namespace {
     }
 }
 
-Lenia::StreamArena::StreamArena(u32 size, u32 fps, f32 dt, const std::vector<StreamOrganism>& organisms) :
+Lenia::StreamArena::StreamArena(u32 size, u32 fps, f32 dt, f32 spaceSpeedMultiplier, const std::vector<StreamOrganism>& organisms) :
     m_engine(size, size, 512, 512, 1, dt, true),
-    m_size(size), m_fps(fps), m_dt(dt) {
+    m_size(size), m_fps(fps), m_dt(dt), m_spaceSpeedMultiplier(spaceSpeedMultiplier) {
     m_engine.m_simulation.reset();
     m_engine.m_currentAnimal.reset();
     m_program = program("../shaders/lenia.vert", "../shaders/arena.frag", GL_FRAGMENT_SHADER);
@@ -39,6 +39,10 @@ Lenia::StreamArena::StreamArena(u32 size, u32 fps, f32 dt, const std::vector<Str
     glGenBuffers(1, &m_boundsBuffer);
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_boundsBuffer);
     glBufferData(GL_SHADER_STORAGE_BUFFER, 4 * sizeof(i32), nullptr, GL_DYNAMIC_COPY);
+    for (const auto& palette : {Magma, Ocean, Aurora, Ember, Ice}) {
+        m_palettes.push_back(std::make_unique<Buffer<ColorPalette>>(BufferBinding::COLOR,
+            std::vector<ColorPalette>{palette}));
+    }
     m_slots.resize(organisms.size());
     for (std::size_t index = 0; index < organisms.size(); ++index) {
         initialize(m_slots[index], organisms[index]);
@@ -81,6 +85,10 @@ void Lenia::StreamArena::initialize(Slot& slot, const StreamOrganism& organism) 
     slot.simulation->loadFFT();
     slot.position = {organism.x, organism.y};
     slot.frames = 0;
+    static std::mt19937 generator(std::random_device{}());
+    slot.palette = std::uniform_int_distribution<u32>(0, static_cast<u32>(m_palettes.size() - 1))(generator);
+    slot.displayScale = std::uniform_real_distribution<f32>(0.5f, 2.f)(generator);
+    slot.speedMultiplier = std::uniform_real_distribution<f32>(0.5f, 2.f)(generator);
     slot.heading = 1.57079632679f;
     slot.spawning = false;
     slot.field = {};
@@ -107,12 +115,13 @@ void Lenia::StreamArena::normalizeVelocities() {
         const auto& animal = *slot.animal;
         const f32 size = std::max(animal.m_info.m_w, animal.m_info.m_h) * animal.m_scale;
         const f32 speed = std::hypot(slot.velocity.x, slot.velocity.y);
-        slot.velocity *= ((m_outward ? 2.f : 1.f) * 25.f * smallest / size) / speed;
+        slot.velocity *= ((m_boosted ? m_spaceSpeedMultiplier : 1.f) * slot.speedMultiplier * 25.f * smallest / size) / speed;
     }
 }
 
-void Lenia::StreamArena::redirect(bool outward) {
+void Lenia::StreamArena::redirect(bool outward, bool boosted) {
     m_outward = outward;
+    m_boosted = boosted;
     normalizeVelocities();
     for (auto& slot : m_slots) slot.steeringTime = 0.f;
 }
@@ -176,7 +185,7 @@ std::vector<u8> Lenia::StreamArena::frame() {
         const f32 width = injured ? slot.field.width : bounds[2] - bounds[0] + 1;
         const f32 height = injured ? slot.field.height : bounds[3] - bounds[1] + 1;
         const f32 fit = injured ? slot.field.fit
-            : std::min(1.f, std::min(64.f, (m_size * 0.5f - 8.f) * 0.55f) / std::max(width, height));
+            : slot.displayScale * std::min(1.f, std::min(64.f, (m_size * 0.5f - 8.f) * 0.55f) / std::max(width, height));
         slot.radius = std::hypot(width, height) * fit * 0.5f + 2.f;
         advance(slot);
         const f32 angle = std::atan2(slot.velocity.y, slot.velocity.x) - slot.heading;
@@ -200,6 +209,7 @@ std::vector<u8> Lenia::StreamArena::frame() {
         glUniform1f(4, angle);
         glUniform1f(5, fit);
         glUniform1i(6, false);
+        glBindBufferBase(GL_SHADER_STORAGE_BUFFER, static_cast<u8>(BufferBinding::COLOR), m_palettes[slot.palette]->m_ID);
         glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_BYTE, Engine::ce_indices);
     }
     glDisable(GL_SCISSOR_TEST);
@@ -219,9 +229,10 @@ std::vector<f32> Lenia::StreamArena::masses() const {
 
 int Lenia::streamArena() {
     u32 size, fps, count;
-    f32 dt;
-    if (!(std::cin >> size >> fps >> dt >> count) || size < 256 || size > 1024 || fps < 1 || fps > 60 ||
-        count < 1 || count > 100 || !std::isfinite(dt) || dt <= 0.f || dt > 0.2f) return 1;
+    f32 dt, spaceSpeedMultiplier;
+    if (!(std::cin >> size >> fps >> dt >> spaceSpeedMultiplier >> count) || size < 256 || size > 1024 || fps < 1 || fps > 60 ||
+        count < 1 || count > 100 || !std::isfinite(dt) || dt <= 0.f || dt > 0.2f ||
+        !std::isfinite(spaceSpeedMultiplier) || spaceSpeedMultiplier < 1.f) return 1;
     std::vector<StreamOrganism> organisms(count);
     for (auto& organism : organisms) if (!readOrganism(organism)) return 1;
     int devices = 0;
@@ -230,7 +241,7 @@ int Lenia::streamArena() {
         return 1;
     }
     try {
-        StreamArena arena(size, fps, dt, organisms);
+        StreamArena arena(size, fps, dt, spaceSpeedMultiplier, organisms);
         std::cout << "READY\n" << std::flush;
         char command;
         while (std::cin >> command) {
@@ -243,8 +254,8 @@ int Lenia::streamArena() {
                 std::cout << "READY\n" << std::flush;
                 continue;
             }
-            if (command == 'o' || command == 'i') {
-                arena.redirect(command == 'o');
+            if (command == 'o' || command == 'i' || command == 'b') {
+                arena.redirect(command == 'o', command != 'i');
                 std::cout << "READY\n" << std::flush;
                 continue;
             }

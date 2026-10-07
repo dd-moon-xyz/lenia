@@ -28,7 +28,7 @@ while True:
         break
     if command in b' \\n':
         continue
-    if command in (b'o', b'i'):
+    if command in (b'o', b'i', b'b'):
         print('READY', flush=True)
         continue
     if command == b'r':
@@ -161,6 +161,9 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
                 await viewer.send(json.dumps(config))
                 self.assertEqual(json.loads(await viewer.recv())["status"], "started")
                 for _ in range(8):
+                    for command in ("outward", "inward_fast", "inward"):
+                        await viewer.send(command)
+
                     await viewer.send("next")
                     image = Image.open(io.BytesIO(await viewer.recv()))
                     self.assertEqual(image.size, (512, 512))

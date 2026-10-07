@@ -23,7 +23,8 @@ const context = canvas.getContext('2d');
 const select = document.querySelector('#organism');
 config.value = JSON.stringify({action: 'start', size: 512, fps: 20, dt: 0.1,
   organisms: [{type: 0, scale: 1, x: 128, y: 128}, {type: 0, scale: 1, x: 320, y: 320}]}, null, 2);
-let socket, paused = false, pending = false, circular = false, spaceHeld = false;
+let socket, paused = false, pending = false, circular = false;
+const heldKeys = new Map();
 fetch('/organisms').then(response => response.json()).then(items => {
   for (const item of items) select.add(new Option(item.name, item.type));
 }).catch(error => status.textContent = error.message);
@@ -85,23 +86,24 @@ document.querySelector('#pause').onclick = event => {
   if (!paused) requestFrame();
 };
 document.querySelector('#stop').onclick = () => { socket?.close(); status.textContent = 'Stopped'; };
-function steer(outward) {
-  spaceHeld = outward;
-  if (socket?.readyState === WebSocket.OPEN && circular) socket.send(outward ? 'outward' : 'inward');
+function steer() {
+  if (socket?.readyState === WebSocket.OPEN && circular) socket.send([...heldKeys.values()].at(-1) ?? 'inward');
 }
 document.addEventListener('keydown', event => {
-  if (event.code !== 'Space' || event.repeat || ['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(event.target.tagName)) return;
+  if (!['Space', 'KeyC', 'KeyV'].includes(event.code) || event.repeat || ['TEXTAREA', 'INPUT', 'SELECT', 'BUTTON'].includes(event.target.tagName)) return;
   if (socket?.readyState === WebSocket.OPEN && circular) {
     event.preventDefault();
-    steer(true);
+    heldKeys.set(event.code, event.code === 'KeyV' ? 'inward_fast' : 'outward');
+    steer();
   }
 });
 document.addEventListener('keyup', event => {
-  if (event.code === 'Space' && spaceHeld) {
+  if (heldKeys.has(event.code)) {
     event.preventDefault();
-    steer(false);
+    heldKeys.delete(event.code);
+    steer();
   }
 });
-window.addEventListener('blur', () => { if (spaceHeld) steer(false); });
+window.addEventListener('blur', () => { if (heldKeys.size) { heldKeys.clear(); steer(); } });
 </script>
 </html>

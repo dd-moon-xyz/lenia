@@ -599,7 +599,7 @@ void Lenia::Engine::update() noexcept {
         }
 
         if (state.paletteChanged) {
-            const ColorPalette* palettes[] = { &Magma, &Greyscale };
+            const ColorPalette* palettes[] = { &Magma, &Greyscale, &Ocean, &Aurora, &Ember, &Ice };
             applyColorPalette(*palettes[state.paletteIndex]);
         }
 

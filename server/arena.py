@@ -58,8 +58,8 @@ class CircularArena:
         self.dead_frames[index] = 0
         logger.info("Organism born outside visible circle: slot=%s type=%s scale=%s velocity=%.1f", index, organism.type, organism.scale, organism.velocity)
 
-    async def redirect(self, outward: bool) -> None:
-        await self.worker.redirect(outward)
+    async def redirect(self, outward: bool, boosted: bool = False) -> None:
+        await self.worker.redirect(outward, boosted)
 
     async def close(self) -> None:
         for task in self.pending.values():

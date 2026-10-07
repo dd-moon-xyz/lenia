@@ -54,15 +54,15 @@ async def stream(websocket: WebSocket):
                         await websocket.send_json({"status": "stopped"})
                         break
 
-                    if command in {"outward", "inward"}:
+                    if command in {"outward", "inward", "inward_fast"}:
                         if config.boundary != "circle":
                             raise ValueError("Directed trajectories require a circular arena")
 
-                        await worker.redirect(command == "outward")
+                        await worker.redirect(command == "outward", command != "inward")
                         continue
 
                     if command != "next":
-                        raise ValueError("Send 'next' for a frame, 'outward' or 'inward' to steer organisms, or 'stop' to end the simulation")
+                        raise ValueError("Send 'next' for a frame, 'outward', 'inward', or 'inward_fast' to steer organisms, or 'stop' to end the simulation")
 
                     await websocket.send_bytes(await worker.frame())
     except WebSocketDisconnect as error:

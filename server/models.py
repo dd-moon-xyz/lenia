@@ -24,6 +24,7 @@ class Start(BaseModel):
     fps: int = Field(default=20, ge=1, le=60)
     pixel_size: int = Field(default=1, ge=1, le=16)
     dt: float = Field(default=0.1, gt=0, le=0.2, allow_inf_nan=False)
+    space_speed_multiplier: float = Field(default=2.0, ge=1, allow_inf_nan=False)
     boundary: Literal["wrap", "circle"] = "wrap"
     organisms: list[Organism] = Field(min_length=1, max_length=100)
 
