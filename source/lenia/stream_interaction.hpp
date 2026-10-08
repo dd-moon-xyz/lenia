@@ -20,8 +20,10 @@ namespace Lenia {
         void reset(u32 index, u32 size);
         void apply(const std::vector<InteractionField>& fields, f32 dt);
         f32 health(u32 index) const { return m_health[index]; }
+        const f32* envelope(u32 index) const { return m_envelopes[index]; }
     private:
         std::array<c64*, STREAM_MAX_ORGANISMS> m_snapshots{};
+        std::array<f32*, STREAM_MAX_ORGANISMS> m_envelopes{};
         std::array<f32, STREAM_MAX_ORGANISMS> m_health{}, m_stress{};
         f32* m_exposure = nullptr;
         void* m_scene = nullptr;

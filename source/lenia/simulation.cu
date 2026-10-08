@@ -22,7 +22,8 @@ __device__ f32 growth(const f32 f, const f32 mu, const f32 sigma)
 
 __device__ Lenia::c64 leniastep(Lenia::c64 resultField, Lenia::c64 inv, f32 norm, f32 dt, f32 mu, f32 sigma, f32 maximumState)
 {
-    f32 val = min(max(resultField.x + dt * growth(inv.x * norm, mu, sigma), 0.f), maximumState);
+    if (maximumState <= 0.f) return {0.f, 0.f};
+    f32 val = min(max(resultField.x + dt * maximumState * growth(inv.x * norm / maximumState, mu, sigma), 0.f), maximumState);
     return {val, 0.f};
 }
 
@@ -231,7 +232,7 @@ void Lenia::Simulation::stepLayer(c64 *layerResult, const std::size_t fftOffset,
         maximumState);
 }
 
-void Lenia::Simulation::updateFFT(const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma, const f32 maximumState) noexcept
+void Lenia::Simulation::updateFFT(const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma, const f32 maximumState, const f32 *envelope) noexcept
 {
     using namespace thrust::placeholders;
 
@@ -269,6 +270,13 @@ void Lenia::Simulation::updateFFT(const Lenia::c64 *animalKernel, const f32 dt, 
             m_fragBuffer,
             [] __device__(const c64 &player, const c64 &world)
             { return c64{max(player.x - world.x, 0.f), 0.f}; });
+    }
+
+    if (envelope) {
+        thrust::transform(thrust::device, m_fragBuffer, m_fragBuffer + m_size, envelope, m_fragBuffer,
+            [maximumState] __device__(const c64 &cell, const f32 limit) {
+                return c64{min(cell.x, limit * maximumState), 0.f};
+            });
     }
 
     auto zipped_begin = thrust::make_zip_iterator(thrust::make_tuple(idx_first, m_fragBuffer));

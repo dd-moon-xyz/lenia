@@ -36,11 +36,11 @@ namespace Lenia
 		void setPersistentBuffer(const std::vector<f32> &cells, const size_t c_w, const size_t c_h) noexcept;
 		void clearPersistentBuffer() noexcept;
 		void setShowDebugInfo(const bool showDebugInfo) noexcept;
-		void update(const Lenia::Animal &animal, const f32 dt, const f32 maximumState = 1.f) noexcept;
+		void update(const Lenia::Animal &animal, const f32 dt, const f32 maximumState = 1.f, const f32 *envelope = nullptr) noexcept;
 		void bindField() const noexcept;
 		c64* deviceField() const noexcept { return m_fragBuffer; }
 		void loadFFT() noexcept;
-		void updateFFT(const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma, const f32 maximumState = 1.f) noexcept;
+		void updateFFT(const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma, const f32 maximumState = 1.f, const f32 *envelope = nullptr) noexcept;
 		void stepLayer(c64 *layerResult, const std::size_t fftOffset, const Lenia::c64 *animalKernel, const f32 dt, const f32 mu, const f32 sigma, const f32 maximumState = 1.f) noexcept;
 		f32 getMoveScalar(const glm::vec2 dest) const noexcept;
 		size_t getNBoundingBoxes() const noexcept;

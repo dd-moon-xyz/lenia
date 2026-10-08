@@ -90,6 +90,7 @@ void Lenia::StreamArena::initialize(Slot& slot, const StreamOrganism& organism) 
     slot.displayScale = std::uniform_real_distribution<f32>(0.5f, 2.f)(generator);
     slot.speedMultiplier = std::uniform_real_distribution<f32>(0.5f, 2.f)(generator);
     slot.heading = 1.57079632679f;
+    slot.visual = {};
     slot.spawning = false;
     slot.field = {};
     m_interaction.reset(static_cast<u32>(&slot - m_slots.data()), organism.size);
@@ -163,12 +164,12 @@ std::vector<u8> Lenia::StreamArena::frame() {
     for (auto& slot : m_slots) {
         slot.field.active = false;
         auto& simulation = *slot.simulation;
-        const bool injured = m_interaction.health(static_cast<u32>(&slot - m_slots.data())) < 1.f;
-        simulation.update(*slot.animal, injured ? 0.f : std::min(m_dt, slot.animal->m_info.m_dt));
+        const u32 index = static_cast<u32>(&slot - m_slots.data());
+        const f32 health = m_interaction.health(index);
+        const bool injured = health < 1.f;
+        simulation.update(*slot.animal, std::min(m_dt, slot.animal->m_info.m_dt), health, m_interaction.envelope(index));
         simulation.bindField();
-        if (slot.frames++ > 0 && !injured && std::hypot(simulation.m_direction.x, simulation.m_direction.y) > 0.01f) {
-            slot.heading = std::atan2(simulation.m_direction.y, simulation.m_direction.x);
-        }
+        ++slot.frames;
         if (simulation.m_mass <= 0.001) continue;
         const i32 empty[] = {static_cast<i32>(simulation.m_w), static_cast<i32>(simulation.m_h), -1, -1};
         glNamedBufferSubData(m_boundsBuffer, 0, sizeof(empty), empty);
@@ -182,17 +183,27 @@ std::vector<u8> Lenia::StreamArena::frame() {
         i32 bounds[4];
         glGetNamedBufferSubData(m_boundsBuffer, 0, sizeof(bounds), bounds);
         if (bounds[2] < bounds[0]) continue;
-        const f32 width = injured ? slot.field.width : bounds[2] - bounds[0] + 1;
-        const f32 height = injured ? slot.field.height : bounds[3] - bounds[1] + 1;
-        const f32 fit = injured ? slot.field.fit
-            : slot.displayScale * std::min(1.f, std::min(64.f, (m_size * 0.5f - 8.f) * 0.55f) / std::max(width, height));
+        const f32 bodyWidth = bounds[2] - bounds[0] + 1;
+        const f32 bodyHeight = bounds[3] - bounds[1] + 1;
+        const glm::vec2 targetSource{
+            simulation.m_centerOfMass.x + (bounds[0] + bounds[2]) * 0.5f - simulation.m_w * 0.5f,
+            simulation.m_centerOfMass.y + (bounds[1] + bounds[3]) * 0.5f - simulation.m_h * 0.5f};
+        if (!injured) {
+            const f32 targetFit = slot.displayScale * std::min(1.f,
+                std::min(64.f, (m_size * 0.5f - 8.f) * 0.55f) / std::max(bodyWidth, bodyHeight));
+            slot.visual.update(simulation.m_centerOfMass, targetSource, targetFit, simulation.m_w, 1.f / m_fps);
+            slot.heading = slot.visual.heading;
+        }
+        const f32 sourceX = injured ? slot.field.sourceX : slot.visual.source.x;
+        const f32 sourceY = injured ? slot.field.sourceY : slot.visual.source.y;
+        const f32 width = injured ? slot.field.width
+            : bodyWidth + 2.f * std::abs(std::remainder(targetSource.x - sourceX, static_cast<f32>(simulation.m_w)));
+        const f32 height = injured ? slot.field.height
+            : bodyHeight + 2.f * std::abs(std::remainder(targetSource.y - sourceY, static_cast<f32>(simulation.m_h)));
+        const f32 fit = injured ? slot.field.fit : slot.visual.fit;
         slot.radius = std::hypot(width, height) * fit * 0.5f + 2.f;
         advance(slot);
         const f32 angle = std::atan2(slot.velocity.y, slot.velocity.x) - slot.heading;
-        const f32 sourceX = injured ? slot.field.sourceX
-            : simulation.m_centerOfMass.x + (bounds[0] + bounds[2]) * 0.5f - simulation.m_w * 0.5f;
-        const f32 sourceY = injured ? slot.field.sourceY
-            : simulation.m_centerOfMass.y + (bounds[1] + bounds[3]) * 0.5f - simulation.m_h * 0.5f;
         slot.field = {simulation.deviceField(), static_cast<u32>(simulation.m_w), sourceX, sourceY,
             slot.position.x, slot.position.y, angle, fit, width, height, slot.radius,
             static_cast<f32>(simulation.m_mass), true};

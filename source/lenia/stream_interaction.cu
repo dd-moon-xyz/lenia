@@ -63,6 +63,12 @@ namespace {
         if (threadIdx.x == 0) atomicAdd(exposure + target, sums[0]);
     }
 
+    __global__ void captureEnvelope(const Lenia::c64* cells, float* envelope, u32 size) {
+        const u32 index = blockIdx.x * blockDim.x + threadIdx.x;
+        if (index >= size * size) return;
+        envelope[index] = cells[index].x > 0.02f ? 1.f : 0.f;
+    }
+
     __global__ void fade(Lenia::c64* cells, u32 count, float retention) {
         const u32 index = blockIdx.x * blockDim.x + threadIdx.x;
         if (index < count) cells[index] = {cells[index].x * retention, 0.f};
@@ -71,11 +77,14 @@ namespace {
 
 Lenia::StreamInteraction::~StreamInteraction() {
     for (auto snapshot : m_snapshots) cudaFree(snapshot);
+    for (auto envelope : m_envelopes) cudaFree(envelope);
     cudaFree(m_exposure);
     cudaFree(m_scene);
 }
 
 void Lenia::StreamInteraction::reset(u32 index, u32 size) {
+    checked(cudaFree(m_envelopes[index]));
+    m_envelopes[index] = nullptr;
     checked(cudaFree(m_snapshots[index]));
     m_snapshots[index] = nullptr;
     checked(cudaMalloc(&m_snapshots[index], size * size * sizeof(c64)));
@@ -120,9 +129,14 @@ void Lenia::StreamInteraction::apply(const std::vector<InteractionField>& fields
         const float contact = std::clamp(exposure[index] / std::max(fields[index].mass, 0.001f), 0.f, 1.f);
         const float previousHealth = m_health[index];
         m_stress[index] = std::min(1.f, m_stress[index] + dt * contact * 3.f);
-        m_health[index] = std::max(0.f, m_health[index] - dt * (0.04f * m_stress[index] + 0.15f * contact));
+        m_health[index] = std::max(0.f, m_health[index] - dt * (0.08f * m_stress[index] + 0.30f * contact));
         if (fields[index].cells && m_health[index] < previousHealth) {
             const u32 count = fields[index].size * fields[index].size;
+            if (!m_envelopes[index]) {
+                checked(cudaMalloc(&m_envelopes[index], count * sizeof(f32)));
+                captureEnvelope<<<(count + 255) / 256, 256>>>(fields[index].cells, m_envelopes[index], fields[index].size);
+                checked(cudaGetLastError());
+            }
             fade<<<(count + 255) / 256, 256>>>(fields[index].cells, count, m_health[index] / previousHealth);
             checked(cudaGetLastError());
         }

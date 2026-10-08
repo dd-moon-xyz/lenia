@@ -76,8 +76,8 @@ void Lenia::Simulation::processLayerInfo() noexcept {
 	m_direction = normalizeOrZero(movement);
 }
 
-void Lenia::Simulation::update(const Animal &animal, const f32 dt, const f32 maximumState) noexcept {
-	updateFFT(thrust::raw_pointer_cast(animal.m_GPUfftKernel.data()), dt, animal.m_info.m_mu, animal.m_info.m_sigma, maximumState);
+void Lenia::Simulation::update(const Animal &animal, const f32 dt, const f32 maximumState, const f32 *envelope) noexcept {
+	updateFFT(thrust::raw_pointer_cast(animal.m_GPUfftKernel.data()), dt, animal.m_info.m_mu, animal.m_info.m_sigma, maximumState, envelope);
 	processLayerInfo();
 }
 

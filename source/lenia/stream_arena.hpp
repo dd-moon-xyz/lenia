@@ -2,6 +2,7 @@
 
 #include "engine.hpp"
 #include "stream_interaction.hpp"
+#include "stream_motion.hpp"
 
 namespace Lenia {
     struct StreamOrganism {
@@ -23,6 +24,7 @@ namespace Lenia {
             std::unique_ptr<Simulation> simulation;
             glm::vec2 position, velocity;
             f32 heading = 1.57079632679f;
+            StreamVisualMotion visual;
             f32 radius = 1.f;
             f32 displayScale = 1.f;
             f32 speedMultiplier = 1.f;
