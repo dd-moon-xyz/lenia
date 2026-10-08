@@ -1,11 +1,14 @@
 #include "engine.hpp"
 #include "stream_arena.hpp"
+#include "stream_hexapod.hpp"
 #include <iostream>
 
 #define SEARCH_DEBUG
 
 int main(int argc, char** argv)
 {
+    if (argc == 2 && std::string(argv[1]) == "--stream-hexapod-preview") return Lenia::streamHexapod(true);
+    if (argc == 2 && std::string(argv[1]) == "--stream-hexapod") return Lenia::streamHexapod();
     if (argc == 2 && std::string(argv[1]) == "--stream-arena") return Lenia::streamArena();
     if (argc == 2 && (std::string(argv[1]) == "--stream" || std::string(argv[1]) == "--stream-centered")) {
         u32 size, animalIdx, scale, organisms;

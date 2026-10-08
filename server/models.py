@@ -10,7 +10,7 @@ __all__ = ["Organism", "Start"]
 
 class Organism(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    type: int = Field(ge=0, lt=len(ANIMALS))
+    type: int = Field(ge=0, le=len(ANIMALS))
     scale: int = Field(default=1, ge=1, le=10)
     x: int = Field(default=128, ge=0)
     y: int = Field(default=128, ge=0)
@@ -19,6 +19,7 @@ class Organism(BaseModel):
 
 class Start(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
+    simulation: Literal["lenia", "hexapod"] = "lenia"
     action: Literal["start"]
     size: int = Field(default=512, ge=256, le=1024)
     fps: int = Field(default=20, ge=1, le=60)
@@ -32,6 +33,15 @@ class Start(BaseModel):
 
     @model_validator(mode="after")
     def validate_world(self):
+        if self.simulation == "hexapod":
+            if self.boundary != "circle" or any(item.type != len(ANIMALS) for item in self.organisms):
+                raise ValueError("Hexapod mode requires a circular arena and the hexapod organism type")
+
+            if any(item.x >= self.size or item.y >= self.size for item in self.organisms):
+                raise ValueError("Organism positions must be inside the world")
+
+            return self
+
         if any(item.type not in AVAILABLE_TYPES for item in self.organisms):
             raise ValueError("Organism type is outside the configured ranges")
 

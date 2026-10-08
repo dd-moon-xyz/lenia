@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from server.catalog import AVAILABLE_TYPES
+from server.catalog import ANIMALS, AVAILABLE_TYPES
 from server.models import Start
 from server.presets import default_config
 from server.births import replacement_organism
@@ -38,13 +38,13 @@ class ArenaTests(unittest.TestCase):
 
         self.assertAlmostEqual(config.organisms[0].velocity * 80, config.organisms[1].velocity * 84)
 
-    def test_default_scene_includes_all_types_in_the_intervals(self):
+    def test_default_scene_uses_fifty_hexapods(self):
         config = Start.model_validate(default_config())
-        self.assertEqual(len(config.organisms), 100)
-        self.assertEqual({item.type for item in config.organisms}, set(range(18)))
+        self.assertEqual(len(config.organisms), 50)
+        self.assertEqual({item.type for item in config.organisms}, {len(ANIMALS)})
         self.assertFalse({item.type for item in config.organisms} & set(config.excluded_types))
         self.assertTrue(all(item.scale == 1 for item in config.organisms))
-        self.assertTrue(all(0 <= item.type <= 17 for item in config.organisms))
+        self.assertEqual(config.simulation, "hexapod")
         self.assertTrue(all(math.hypot(item.x - 512, item.y - 512) <= 401 for item in config.organisms))
 
     def test_all_types_in_the_intervals_are_allowed(self):
@@ -66,7 +66,7 @@ class ArenaTests(unittest.TestCase):
 
     def test_birth_remains_available_with_all_types_alive(self):
         config = Start.model_validate(default_config())
-        current = {item.type for item in config.organisms[1:]}
+        current = set(AVAILABLE_TYPES)
         replacement = replacement_organism(config.size)
         self.assertIn(replacement.type, current)
         self.assertEqual(replacement.scale, 1)

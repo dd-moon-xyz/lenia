@@ -21,16 +21,20 @@ const status = document.querySelector('#status');
 const canvas = document.querySelector('#canvas');
 const context = canvas.getContext('2d');
 const select = document.querySelector('#organism');
-config.value = JSON.stringify({action: 'start', size: 512, fps: 20, dt: 0.1,
-  organisms: [{type: 0, scale: 1, x: 128, y: 128}, {type: 0, scale: 1, x: 320, y: 320}]}, null, 2);
+fetch('/preset').then(response => response.json()).then(data => {
+  config.value = JSON.stringify(data, null, 2);
+  select.value = String(data.organisms[0].type);
+}).catch(error => status.textContent = error.message);
 let socket, paused = false, pending = false, circular = false;
 const heldKeys = new Map();
 fetch('/organisms').then(response => response.json()).then(items => {
   for (const item of items) select.add(new Option(item.name, item.type));
+  if (config.value) select.value = String(JSON.parse(config.value).organisms[0].type);
 }).catch(error => status.textContent = error.message);
 select.onchange = () => {
   try {
     const data = JSON.parse(config.value);
+    data.simulation = select.selectedOptions[0].textContent === "Six-arm hexapod" ? "hexapod" : "lenia";
     data.organisms.forEach(item => item.type = Number(select.value));
     config.value = JSON.stringify(data, null, 2);
   } catch (error) { status.textContent = error.message; }

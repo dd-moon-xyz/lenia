@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from server.arena import CircularArena
-from server.catalog import ANIMALS
+from server.catalog import ANIMALS, AVAILABLE_TYPES
 from server.births import replacement_organism
 from server.models import Start
 
@@ -42,6 +42,20 @@ class BirthTests(unittest.IsolatedAsyncioTestCase):
             self.assertIn(organism.type, range(len(ANIMALS)))
             self.assertGreaterEqual(angle, 0)
             self.assertLessEqual(angle, 2 * math.pi)
+        finally:
+            await arena.close()
+
+    async def test_dead_hexapod_is_replaced_with_hexapod(self):
+        config = Start.model_validate({"action": "start", "simulation": "hexapod", "boundary": "circle", "fps": 60, "organisms": [{"type": len(ANIMALS)}]})
+        worker = FakeWorker(config)
+        arena = CircularArena(config, worker)
+        try:
+            for _ in range(6):
+                await arena.frame()
+
+            self.assertEqual(len(worker.replacements), 1)
+            self.assertEqual(worker.replacements[0][1].type, len(ANIMALS))
+            self.assertEqual(worker.replacements[0][1].scale, 1)
         finally:
             await arena.close()
 
@@ -93,4 +107,4 @@ class BirthTests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(set(candidates) & {0, 1, 2})
         self.assertIn(6, candidates)
         self.assertIn(16, candidates)
-        self.assertEqual(set(candidates), set(range(3, 18)))
+        self.assertEqual(set(candidates), set(AVAILABLE_TYPES) - {0, 1, 2})

@@ -11,11 +11,12 @@ from PIL import Image
 from websockets.asyncio.client import connect
 
 from server.app import app
+from server.presets import default_config
 
 WORKER = """
 import sys
 import struct
-arena = '--stream-arena' in sys.argv
+arena = any(option in sys.argv for option in ('--stream-arena', '--stream-hexapod'))
 header = sys.stdin.buffer.readline().split()
 size, count = int(header[0]), int(header[-1])
 for _ in range(count):
@@ -90,6 +91,30 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any("connection opened" in line for line in logs.output))
         self.assertTrue(any("connection closed" in line and "client disconnected" in line for line in logs.output))
         self.assertTrue(any("connection closed" in line and "simulation busy" in line for line in logs.output))
+
+    async def test_hexapod_preset_streams_fifty_walkers(self):
+        launch = asyncio.create_subprocess_exec
+        commands = []
+
+        async def worker(*args, **kwargs):
+            commands[:] = args
+            return await launch(sys.executable, "-u", "-c", WORKER, *args[1:], **kwargs)
+
+        with patch("server.worker.asyncio.create_subprocess_exec", worker):
+            async with connect(self.url) as viewer:
+                await viewer.send(json.dumps(default_config()))
+                self.assertEqual(json.loads(await viewer.recv())["status"], "started")
+                await viewer.send("outward")
+                await viewer.send("next")
+                first = await asyncio.wait_for(viewer.recv(), 10)
+                await viewer.send("inward")
+                await viewer.send("next")
+                second = await asyncio.wait_for(viewer.recv(), 10)
+                self.assertEqual(Image.open(io.BytesIO(second)).size, (1024, 1024))
+                await viewer.send("stop")
+                self.assertEqual(json.loads(await viewer.recv())["status"], "stopped")
+
+            self.assertIn("--stream-hexapod", commands)
 
     async def test_invalid_configuration(self):
         cases = (

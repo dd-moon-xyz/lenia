@@ -19,7 +19,7 @@ class SimulationWorker:
         self.lock = asyncio.Lock()
 
     def organism_line(self, item: Organism) -> str:
-        size = organism_config(self.config, item).size
+        size = self.config.size if self.config.simulation == "hexapod" else organism_config(self.config, item).size
         return f"{size} {item.type} {item.scale} {item.x} {item.y} {item.velocity}"
 
     async def ready(self) -> None:
@@ -84,7 +84,7 @@ class SimulationWorker:
 @asynccontextmanager
 async def simulation_worker(config: Start) -> AsyncIterator[SimulationWorker | CircularArena]:
     process = await asyncio.create_subprocess_exec(
-        str(ROOT / "build/lenia"), "--stream-arena" if config.boundary == "circle" else "--stream",
+        str(ROOT / "build/lenia"), "--stream-hexapod" if config.simulation == "hexapod" else ("--stream-arena" if config.boundary == "circle" else "--stream"),
         cwd=ROOT / "build",
         stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,

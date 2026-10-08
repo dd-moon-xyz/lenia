@@ -5,7 +5,8 @@ import random
 
 from server.births import replacement_organism
 from server.frames import encode_frame
-from server.models import Start
+from server.models import Organism, Start
+from server.catalog import ANIMALS
 from server.velocity import normalize_velocities
 
 __all__ = ["CircularArena"]
@@ -50,9 +51,10 @@ class CircularArena:
     async def replace(self, index: int) -> None:
         logger = logging.getLogger("uvicorn.error")
         logger.info("Organism died: slot=%s type=%s", index, self.organisms[index].type)
-        organism = replacement_organism(self.config.size)
+        organism = Organism(type=len(ANIMALS), scale=1) if self.config.simulation == "hexapod" else replacement_organism(self.config.size)
         self.organisms[index] = organism
-        normalize_velocities(self.organisms)
+        if self.config.simulation != "hexapod":
+            normalize_velocities(self.organisms)
         angle = random.uniform(0, 2 * math.pi)
         await self.worker.replace_organism(index, organism, angle)
         self.dead_frames[index] = 0

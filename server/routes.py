@@ -7,6 +7,7 @@ from fastapi.responses import FileResponse
 
 from server.catalog import ANIMALS, ROOT
 from server.models import Start
+from server.presets import default_config
 from server.worker import simulation_worker
 
 __all__ = ["router"]
@@ -21,9 +22,14 @@ async def viewer():
     return FileResponse(ROOT / "server/viewer.html")
 
 
+@router.get("/preset")
+async def preset():
+    return default_config()
+
+
 @router.get("/organisms")
 async def organisms():
-    return [{"type": index, "name": row[4]} for index, row in enumerate(ANIMALS)]
+    return [{"type": index, "name": row[4]} for index, row in enumerate(ANIMALS)] + [{"type": len(ANIMALS), "name": "Six-arm hexapod"}]
 
 
 @router.websocket("/ws")
