@@ -42,12 +42,10 @@ class VideoRecorder:
 
 @asynccontextmanager
 async def record_video(path: Path, fps: int):
-    if path.exists():
-        raise ValueError(f"Recording already exists: {path}")
-
     process = await asyncio.create_subprocess_exec(
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-n",
+        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg", "-i", "pipe:0",
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
         "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path.resolve()),
         stdin=asyncio.subprocess.PIPE,
