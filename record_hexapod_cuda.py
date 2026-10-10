@@ -67,7 +67,7 @@ def record(path: Path, duration: float, fps: int, speed: float = 2, story: bool 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Record the CUDA six-arm organism preview")
     parser.add_argument("--output", type=Path, default=ROOT / "resources/hexapod/propulsion.gif")
-    parser.add_argument("--duration", type=float, default=8)
+    parser.add_argument("--duration", type=float, default=30)
     parser.add_argument("--fps", type=int, default=25)
     parser.add_argument("--speed", type=float, default=2)
     parser.add_argument("--story", action="store_true", help="Export MP4 at 1080 × 1920")

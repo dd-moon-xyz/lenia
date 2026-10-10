@@ -28,10 +28,11 @@ namespace {
         return make_float2(cosf(angle) * a.x - sinf(angle) * a.y, sinf(angle) * a.x + cosf(angle) * a.y);
     }
     __device__ float clip(float v, float lo, float hi) { return fminf(hi, fmaxf(lo, v)); }
+    __device__ float structureScale(const Walker& w) { return .35f + .65f * w.health; }
     __device__ float2 root(const Walker& w, int arm) {
         int level = arm % 3;
         float side = arm < 3 ? -1.f : 1.f;
-        return add(w.position, rotate(make_float2(side * 27.712813f * (level == 0 ? 1.f : .7f), -16.f + level * 16.f), w.heading));
+        return add(w.position, rotate(mul(make_float2(side * 27.712813f * (level == 0 ? 1.f : .7f), -16.f + level * 16.f), structureScale(w)), w.heading));
     }
     __device__ float2 rest(int arm) {
         const float angles[] = {.8f, 1.1f, 1.45f};
@@ -72,13 +73,12 @@ namespace {
                 w.trajectory = atan2f(reflected.y, reflected.x);
                 desired = w.trajectory;
             }
-            if (preview) desired = PI * .5f - .45f + .35f * sinf(w.time * .4f);
             float turn = remainderf(desired - PI * .5f - w.heading, 2.f * PI);
             float2 direction = rotate(make_float2(0.f, 1.f), w.heading);
             int contacts = 0, moving = 0;
             for (int arm = 0; arm < 6; ++arm) { contacts += w.feet[arm].progress >= 1.f; moving += w.feet[arm].progress < 1.f; }
             float alignment = fmaxf(0.f, cosf(turn));
-            float speed = 48.f * alignment * contacts / (2.f + contacts);
+            float speed = 48.f * w.health * w.health * alignment * contacts / (2.f + contacts);
             float2 position = add(w.position, mul(direction, speed * interval));
             float heading = w.heading + clip(turn, -interval, interval);
             bool supported = true;
@@ -97,7 +97,7 @@ namespace {
                 Foot& foot = w.feet[arm];
                 float2 r = root(w, arm);
                 if (foot.progress < 1.f) {
-                    foot.progress = fminf(1.f, foot.progress + interval / foot.duration);
+                    foot.progress = fminf(1.f, foot.progress + interval * (.2f + .8f * w.health) / foot.duration);
                     float t = foot.progress, blend = t * t * (3.f - 2.f * t);
                     float2 travel = sub(foot.target, foot.start);
                     float2 point = add(add(foot.start, mul(travel, blend)), mul(make_float2(-travel.y, travel.x), .08f * sinf(PI * t)));
@@ -119,10 +119,15 @@ namespace {
         }
         for (int arm = 0; arm < 6; ++arm) {
             float2 r = root(w, arm), offset = sub(w.feet[arm].position, r);
+            float scale = structureScale(w), length = LENGTH * scale;
+            float fold = (1.f - w.health) * (1.f - w.health);
+            float2 tucked = rotate(make_float2((arm < 3 ? -1.f : 1.f) * 12.f, 18.f), w.heading);
+            offset = add(mul(offset, 1.f - fold), mul(tucked, fold));
+            offset = mul(offset, fminf(1.f, (3.f * length - 3.f) / fmaxf(norm(offset), 1e-9f)));
             float distance = norm(offset), lo = 0.f, hi = 2.f * PI / 3.f;
             for (int iteration = 0; iteration < 24; ++iteration) {
                 float bend = (lo + hi) * .5f;
-                float reach = LENGTH * sinf(3.f * bend * .5f) / sinf(bend * .5f);
+                float reach = length * sinf(3.f * bend * .5f) / sinf(bend * .5f);
                 if (reach > distance) lo = bend; else hi = bend;
             }
             float bend = (lo + hi) * .5f, angle = atan2f(offset.y, offset.x), side = arm < 3 ? -1.f : 1.f;
@@ -130,7 +135,7 @@ namespace {
             w.points[arm][0] = sub(r, w.position);
             for (int part = 0; part < 3; ++part) {
                 float a = angle + side * bend * (part - 1);
-                w.points[arm][part + 1] = add(w.points[arm][part], make_float2(LENGTH * cosf(a), LENGTH * sinf(a)));
+                w.points[arm][part + 1] = add(w.points[arm][part], make_float2(length * cosf(a), length * sinf(a)));
             }
         }
     }
@@ -165,7 +170,7 @@ namespace {
             for (int part = 0; part < 3; ++part) {
                 float2 a = w.points[arm][part], b = w.points[arm][part + 1];
                 float2 v = sub(b, a), d = sub(p, a);
-                float t = clip((d.x * v.x + d.y * v.y) / (LENGTH * LENGTH), 0.f, 1.f);
+                float t = clip((d.x * v.x + d.y * v.y) / fmaxf(v.x * v.x + v.y * v.y, 1e-6f), 0.f, 1.f);
                 float wave = sinf(w.time * 4.f - (part + t) * 2.6f + arm * .8f);
                 float distance = segmentDistance(p, a, b);
                 float outer = tissue(distance - 8.5f, 2.f) * (.49f + .02f * wave);
@@ -173,7 +178,7 @@ namespace {
                 state = fmaxf(state, outer + inner);
             }
         }
-        float2 local = rotate(p, -w.heading);
+        float2 local = mul(rotate(p, -w.heading), 1.f / structureScale(w));
         float head = tissue(hexDistance(add(local, make_float2(0.f, 32.f)), 32.f), 2.f);
         float nucleus = tissue(hexDistance(add(local, make_float2(-1.5f * sinf(w.time * 2.2f), 32.f)), 56.f / 3.f), 2.f);
         state = fmaxf(state, head * .51f + nucleus * (.463f + .039f * sinf(w.time * 2.2f)));
@@ -257,7 +262,7 @@ namespace {
         if (preview || norm(sub(point, center)) < (size * .5f - 8.f) * .9f) {
             for (int i = 0; i < count; ++i) {
                 const Walker& w = walkers[i];
-                float2 local = sub(point, preview ? center : mul(w.position, w.zoom));
+                float2 local = sub(point, mul(w.position, w.zoom));
                 float extent = 350.f * w.zoom;
                 if (fabsf(local.x) > extent || fabsf(local.y) > extent) continue;
                 float px = local.x / (700.f * w.zoom) * RES + RES * .5f - .5f;
@@ -322,7 +327,7 @@ namespace {
         w.previous = w.position;
         w.heading = std::uniform_real_distribution<float>(-PI,PI)(generator);
         w.palette = std::uniform_int_distribution<int>(0,4)(generator);
-        if (preview) { w.zoom = size / 700.f; w.position = make_float2(x / w.zoom, y / w.zoom); w.previous = w.position; w.heading = -.45f; w.palette = 0; }
+        if (preview) { w.zoom = size / 1050.f; w.position = make_float2(0.f, 0.f); w.previous = w.position; w.heading = -PI * .25f; w.palette = 0; }
         w.health = 1.f;
         if (spawning) {
             float radius = (size * .5f - 8.f) * .9f + 700.f * w.zoom * .707107f + 8.f;
