@@ -74,7 +74,8 @@ class SimulationWorker:
             return raw
 
         frame = await asyncio.to_thread(
-            encode_frame, raw, self.config.size, self.config.pixel_size
+            encode_frame, raw, self.config.size, self.config.pixel_size,
+            self.config.output_size,
         )
         await asyncio.sleep(
             max(

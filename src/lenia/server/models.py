@@ -22,6 +22,7 @@ class Start(BaseModel):
     simulation: Literal["lenia", "hexapod"] = "lenia"
     action: Literal["start"]
     size: int = Field(default=512, ge=256, le=1024)
+    output_size: int | None = Field(default=None, ge=1, le=1024)
     fps: int = Field(default=20, ge=1, le=60)
     pixel_size: int = Field(default=1, ge=1, le=16)
     dt: float = Field(default=0.1, gt=0, le=0.2, allow_inf_nan=False)

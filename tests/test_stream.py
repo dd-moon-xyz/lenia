@@ -42,7 +42,8 @@ while True:
     if arena:
         mass = 0.0 if '--die-once' in sys.argv and frames <= 5 else 100.0
         sys.stdout.buffer.write(struct.pack(f'={count}f', *([mass] * count)))
-    sys.stdout.buffer.write(bytes([200, 30, 10]) * size ** 2)
+    red = frames * 40 if '--count-frames' in sys.argv else 200
+    sys.stdout.buffer.write(bytes([red, 30, 10]) * size ** 2)
     sys.stdout.buffer.flush()
 """
 
@@ -62,35 +63,54 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(self.task, 5)
         self.listener.close()
 
-    async def test_frames_busy_and_disconnect_cleanup(self):
+    async def test_independent_clients_and_disconnect_cleanup(self):
         launch = asyncio.create_subprocess_exec
-        processes = []
+        processes = {}
 
         async def worker(*args, **kwargs):
-            process = await launch(sys.executable, "-u", "-c", WORKER, **kwargs)
-            processes[:] = [process]
+            process = await launch(sys.executable, "-u", "-c", WORKER, *args[1:], "--count-frames", **kwargs)
+            processes[args[1]] = process
             return process
 
         with self.assertLogs("uvicorn.error", level="INFO") as logs, patch("lenia.server.worker.asyncio.create_subprocess_exec", worker):
-            async with connect(self.url) as viewer:
-                await viewer.send(json.dumps({"action": "start", "size": 256, "organisms": [{"type": 0}]}))
-                self.assertEqual(json.loads(await viewer.recv())["status"], "started")
-                async with connect(self.url) as second:
-                    self.assertIn("already", json.loads(await second.recv())["error"])
+            async with connect(self.url) as viewer, connect(self.url) as second:
+                await asyncio.gather(
+                    viewer.send(json.dumps({"action": "start", "size": 256, "organisms": [{"type": 0}]})),
+                    second.send(json.dumps({**default_config(), "output_size": 480})),
+                )
 
-                for _ in range(2):
+                statuses = await asyncio.gather(viewer.recv(), second.recv())
+                self.assertEqual(json.loads(statuses[0]), {"status": "started", "size": 256, "fps": 20})
+                self.assertEqual(json.loads(statuses[1]), {"status": "started", "size": 480, "fps": 60})
+                self.assertEqual(len({process.pid for process in processes.values()}), 2)
+                for red in (40, 80):
                     await viewer.send("next")
                     image = Image.open(io.BytesIO(await viewer.recv()))
                     self.assertEqual(image.size, (256, 256))
                     self.assertEqual(image.format, "JPEG")
+                    self.assertAlmostEqual(image.getpixel((0, 0))[0], red, delta=3)
 
-            await asyncio.wait_for(processes[0].wait(), 5)
-            self.assertIsNotNone(processes[0].returncode)
+                await second.send("outward")
+                await second.send("next")
+                image = Image.open(io.BytesIO(await second.recv()))
+                self.assertEqual(image.size, (480, 480))
+                self.assertAlmostEqual(image.getpixel((0, 0))[0], 40, delta=3)
+
+                await viewer.close()
+                await asyncio.wait_for(processes["--stream"].wait(), 5)
+                self.assertIsNone(processes["--stream-hexapod"].returncode)
+                await second.send("next")
+                image = Image.open(io.BytesIO(await second.recv()))
+                self.assertAlmostEqual(image.getpixel((0, 0))[0], 80, delta=3)
+                await second.send("stop")
+                self.assertEqual(json.loads(await second.recv())["status"], "stopped")
+                await asyncio.wait_for(processes["--stream-hexapod"].wait(), 5)
+
             await asyncio.sleep(0.01)
 
         self.assertTrue(any("connection opened" in line for line in logs.output))
         self.assertTrue(any("connection closed" in line and "client disconnected" in line for line in logs.output))
-        self.assertTrue(any("connection closed" in line and "simulation busy" in line for line in logs.output))
+        self.assertTrue(any("connection closed" in line and "client requested stop" in line for line in logs.output))
 
     async def test_hexapod_preset_streams_fifty_walkers(self):
         launch = asyncio.create_subprocess_exec
@@ -122,12 +142,43 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
             {"action": "start", "organisms": [{"type": 0}, {"type": 1}]},
             {"action": "start", "organisms": [{"type": 0, "rotation": 2}]},
             {"action": "start", "size": 256, "organisms": [{"type": 0, "x": 256}]},
+            {"action": "start", "output_size": 0, "organisms": [{"type": 0}]},
+            {"action": "start", "output_size": 1025, "organisms": [{"type": 0}]},
+            {"action": "start", "output_size": 480.0, "organisms": [{"type": 0}]},
         )
 
         for config in cases:
             async with connect(self.url) as viewer:
                 await viewer.send(json.dumps(config))
                 self.assertIn("error", json.loads(await viewer.recv()))
+
+    async def test_display_sized_jpeg_preserves_simulation_world(self):
+        launch = asyncio.create_subprocess_exec
+
+        async def worker(*args, **kwargs):
+            return await launch(sys.executable, "-u", "-c", WORKER, *args[1:], **kwargs)
+
+        configurations = (
+            {"action": "start", "size": 1024, "fps": 60, "organisms": [{"type": 0}]},
+            default_config(),
+        )
+
+        with patch("lenia.server.worker.asyncio.create_subprocess_exec", worker):
+            for config in configurations:
+                with self.subTest(simulation=config.get("simulation", "lenia")):
+                    async with connect(self.url) as viewer:
+                        await viewer.send(json.dumps({**config, "output_size": 480}))
+                        status = json.loads(await viewer.recv())
+                        self.assertEqual(status, {"status": "started", "size": 480, "fps": 60})
+                        await viewer.send("next")
+                        image = Image.open(io.BytesIO(await viewer.recv()))
+                        self.assertEqual(image.size, (480, 480))
+                        self.assertEqual(image.format, "JPEG")
+                        self.assertEqual(len(image.tobytes()), 480 * 480 * 3)
+                        await viewer.send("stop")
+                        self.assertEqual(json.loads(await viewer.recv())["status"], "stopped")
+
+                    await asyncio.sleep(0.01)
 
     async def test_hundred_organism_native_pipeline_and_cleanup(self):
         launch = asyncio.create_subprocess_exec
