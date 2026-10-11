@@ -15,6 +15,7 @@ class SimulationWorker:
     def __init__(self, process: asyncio.subprocess.Process, config: Start):
         self.process = process
         self.config = config
+        self.frame_size = config.size
         self.masses = ()
         self.lock = asyncio.Lock()
 
@@ -54,6 +55,18 @@ class SimulationWorker:
 
         self.process.stdin.write((header + organisms).encode())
         await self.ready()
+        if (
+            self.config.simulation == "hexapod"
+            and self.config.pixel_size == 1
+            and self.config.output_size is not None
+            and self.config.output_size < self.config.size
+        ):
+            self.process.stdin.write(f"s {self.config.output_size}\n".encode())
+            try:
+                await self.ready()
+            except RuntimeError as error:
+                raise RuntimeError("GPU output resizing failed; rebuild the native lenia executable") from error
+            self.frame_size = self.config.output_size
 
     async def frame(self) -> bytes:
         started = asyncio.get_running_loop().time()
@@ -67,7 +80,7 @@ class SimulationWorker:
                     self.masses = struct.unpack(f"={count}f", metadata)
 
                 raw = await self.process.stdout.readexactly(
-                    self.config.size * self.config.size * 3
+                    self.frame_size * self.frame_size * 3
                 )
 
         if self.config.boundary == "circle":

@@ -6,7 +6,9 @@ __all__ = ["encode_frame", "encode_image"]
 
 
 def encode_frame(raw: bytes, size: int, pixel_size: int = 1, output_size: int | None = None) -> bytes:
-    image = Image.frombytes("RGB", (size, size), raw).transpose(Image.Transpose.FLIP_TOP_BOTTOM)
+    # Decode bottom-up rows directly instead of copying the entire image again
+    # to flip GPU output before resizing and JPEG encoding.
+    image = Image.frombytes("RGB", (size, size), raw, "raw", "RGB", 0, -1)
     return encode_image(image, pixel_size, output_size)
 
 

@@ -20,6 +20,8 @@ This implementation focuses on treating Lenia creatures less like passive simula
 
 See the [project wiki](wiki/index.md) for documentation, Linux build instructions, and usage.
 
+For hexapod streams with `pixel_size: 1` and `output_size` smaller than the simulation world, CUDA box-filters the composed frame before GPU readback. A 1024×1024 world sent as 480×480 transfers 691,200 raw RGB bytes per frame instead of 3,145,728, while keeping simulation settings unchanged. The native worker accepts `s <output_size>` after startup and acknowledges `READY`; omitted resizing retains the original protocol. Pixelated, enlarged, and catalog Lenia streams retain CPU resizing. Rebuild `build/lenia` and restart the server together after updating; Python negotiates the resized payload before reading frames.
+
 ## Credits
 
 Forked from [DeepQuantum/Lenia](https://github.com/DeepQuantum/Lenia).

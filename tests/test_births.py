@@ -12,6 +12,7 @@ from lenia.server.models import Start
 class FakeWorker:
     def __init__(self, config, mass=0.0):
         self.config = config
+        self.frame_size = config.size
         self.masses = (mass,)
         self.replacements = ()
 

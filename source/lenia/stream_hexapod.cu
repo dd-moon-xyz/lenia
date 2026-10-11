@@ -1,5 +1,6 @@
 #include "stream_hexapod.hpp"
 #include <cuda_runtime.h>
+#include "stream_resize.hpp"
 #include <algorithm>
 #include <cmath>
 #include <iostream>
@@ -278,6 +279,18 @@ namespace {
         output[index + 1] = static_cast<unsigned char>(255.f * fminf(1.f, rgb.y));
         output[index + 2] = static_cast<unsigned char>(255.f * fminf(1.f, rgb.z));
     }
+    __global__ void resizeHorizontal(const unsigned char* source, unsigned char* rows, int size, int outputSize) {
+        int x = blockIdx.x * blockDim.x + threadIdx.x, y = blockIdx.y * blockDim.y + threadIdx.y;
+        if (x >= outputSize || y >= size) return;
+        for (int channel = 0; channel < 3; ++channel)
+            rows[(y * outputSize + x) * 3 + channel] = Lenia::boxHorizontal(source, size, outputSize, x, y, channel);
+    }
+    __global__ void resizeVertical(const unsigned char* rows, unsigned char* output, int size, int outputSize) {
+        int x = blockIdx.x * blockDim.x + threadIdx.x, y = blockIdx.y * blockDim.y + threadIdx.y;
+        if (x >= outputSize || y >= outputSize) return;
+        for (int channel = 0; channel < 3; ++channel)
+            output[(y * outputSize + x) * 3 + channel] = Lenia::boxVertical(rows, size, outputSize, x, y, channel);
+    }
     __global__ void contact(const Walker* walkers, const float* density, float2* totals, int count) {
         int index = blockIdx.x;
         if (index >= count) return;
@@ -357,6 +370,7 @@ namespace {
         Walker* walkers = nullptr;
         float *density = nullptr, *wake = nullptr, *next = nullptr;
         unsigned char* output = nullptr;
+        unsigned char *resizeRows = nullptr, *resized = nullptr;
         float2* contacts = nullptr;
         float* masses = nullptr;
         Arena(int count, int size) {
@@ -369,7 +383,15 @@ namespace {
             checked(cudaMalloc(&output, size * size * 3));
             checked(cudaMemset(wake, 0, count * RES * RES * sizeof(float)));
         }
-        ~Arena() { cudaFree(walkers); cudaFree(density); cudaFree(wake); cudaFree(next); cudaFree(output); cudaFree(contacts); cudaFree(masses); }
+        void setOutputSize(int size, int outputSize) {
+            cudaFree(resizeRows); resizeRows = nullptr;
+            cudaFree(resized); resized = nullptr;
+            if (outputSize < size) {
+                checked(cudaMalloc(&resizeRows, size * outputSize * 3));
+                checked(cudaMalloc(&resized, outputSize * outputSize * 3));
+            }
+        }
+        ~Arena() { cudaFree(walkers); cudaFree(density); cudaFree(wake); cudaFree(next); cudaFree(output); cudaFree(resizeRows); cudaFree(resized); cudaFree(contacts); cudaFree(masses); }
     };
 }
 
@@ -388,11 +410,20 @@ int Lenia::streamHexapod(bool preview) {
         Arena arena(count,size);
         checked(cudaMemcpy(arena.walkers,walkers.data(),count*sizeof(Walker),cudaMemcpyHostToDevice));
         std::vector<unsigned char> pixels(size*size*3);
+        int outputSize = size;
         std::vector<float> masses(count,100.f);
         bool boosted = false;
         std::cout << "READY\n" << std::flush;
         char command;
         while (std::cin >> command) {
+            if (command == 's') {
+                int requested;
+                if (!(std::cin >> requested) || requested < 1 || requested > size) return 1;
+                arena.setOutputSize(size, requested);
+                outputSize = requested;
+                pixels.resize(outputSize * outputSize * 3);
+                std::cout << "READY\n" << std::flush; continue;
+            }
             if (command == 'o' || command == 'i' || command == 'b') {
                 boosted = command != 'i';
                 redirect<<<(count+63)/64,64>>>(arena.walkers,count,size,command == 'o');
@@ -422,8 +453,12 @@ int Lenia::streamHexapod(bool preview) {
                 std::swap(arena.wake,arena.next);
             }
             compose<<<dim3((size+15)/16,(size+15)/16),block>>>(arena.walkers,arena.density,arena.wake,arena.output,count,size,preview);
+            if (outputSize < size) {
+                resizeHorizontal<<<dim3((outputSize+15)/16,(size+15)/16),block>>>(arena.output,arena.resizeRows,size,outputSize);
+                resizeVertical<<<dim3((outputSize+15)/16,(outputSize+15)/16),block>>>(arena.resizeRows,arena.resized,size,outputSize);
+            }
             checked(cudaGetLastError());
-            checked(cudaMemcpy(pixels.data(),arena.output,pixels.size(),cudaMemcpyDeviceToHost));
+            checked(cudaMemcpy(pixels.data(),outputSize < size ? arena.resized : arena.output,pixels.size(),cudaMemcpyDeviceToHost));
             checked(cudaMemcpy(masses.data(),arena.masses,count*sizeof(float),cudaMemcpyDeviceToHost));
             std::cout.write(reinterpret_cast<const char*>(masses.data()),masses.size()*sizeof(float));
             std::cout.write(reinterpret_cast<const char*>(pixels.data()),pixels.size());
