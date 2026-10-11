@@ -1,4 +1,4 @@
-.PHONY: gif video server client client-record core-build core-run app-build app-run app-up app-stop app-restart
+.PHONY: gif video server client client-record core-build core-run devcontainer-build app-build app-run app-up app-stop app-restart
 
 gif:
 	uv run python record_hexapod_cuda.py
@@ -21,6 +21,10 @@ core-build:
 
 core-run:
 	docker compose run --rm lenia-core
+
+
+devcontainer-build:
+	docker compose build lenia-devcontainer
 
 
 app-build:

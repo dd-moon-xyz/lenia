@@ -1,4 +1,26 @@
 services:
+    lenia-devcontainer:
+        image: lenia-devcontainer
+        container_name: lenia-devcontainer
+        build:
+            context: .
+            dockerfile: Dockerfile
+            target: devcontainer
+        volumes:
+            - .:/workspace:cached
+        environment:
+            NVIDIA_DRIVER_CAPABILITIES: compute,utility
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+        entrypoint: ["tail", "-f", "/dev/null"]
+        networks:
+            - lenia
+
     lenia-core:
         image: lenia-core
         container_name: lenia-core

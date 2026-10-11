@@ -1,0 +1,49 @@
+{
+    "name": "lenia",
+    "initializeCommand": "make devcontainer-build",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "lenia-devcontainer",
+    "runServices": [
+        "lenia-devcontainer"
+    ],
+    "workspaceFolder": "/workspace",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "files.trimFinalNewlines": true,
+                "files.trimTrailingWhitespace": true,
+                "files.watcherExclude": {
+                    ".git/**": true,
+                    "./resources/**": true
+                },
+                "[python]": {
+                    "editor.defaultFormatter": "charliermarsh.ruff",
+                    "editor.codeActionsOnSave": {
+                        "source.fixAll.ruff": "explicit",
+                        "source.organizeImports.ruff": "explicit"
+                    }
+                },
+                "[json]": {
+                    "editor.defaultFormatter": "esbenp.prettier-vscode"
+                },
+                "editor.formatOnSave": true,
+                "ruff.lineLength": 80,
+                "python.defaultInterpreterPath": "/src/.venv/bin/python",
+                "terminal.integrated.defaultProfile.linux": "zsh"
+            },
+            "extensions": [
+                "ms-python.python",
+                "charliermarsh.ruff",
+                "esbenp.prettier-vscode",
+                "eamodio.gitlens",
+                "ms-azuretools.vscode-docker",
+                "tamasfe.even-better-toml",
+                "christian-kohler.path-intellisense"
+            ]
+        }
+    },
+    "postCreateCommand": "bash .devcontainer/entrypoint.sh",
+    "forwardPorts": [
+        9876
+    ]
+}
