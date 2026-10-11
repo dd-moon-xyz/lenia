@@ -1,11 +1,12 @@
-from server.catalog import ANIMALS
+from lenia.server.catalog import ANIMALS
 
 __all__ = ["normalize_velocities"]
 
 
 def normalize_velocities(organisms) -> None:
     sizes = tuple(
-        max(int(ANIMALS[item.type][12]), int(ANIMALS[item.type][13])) * item.scale
+        max(int(ANIMALS[item.type][12]), int(ANIMALS[item.type][13]))
+        * item.scale
         for item in organisms
     )
 

@@ -1,10 +1,10 @@
 import math
 import unittest
 
-from server.catalog import ANIMALS, AVAILABLE_TYPES
-from server.models import Start
-from server.presets import default_config
-from server.births import replacement_organism
+from lenia.server.catalog import ANIMALS, AVAILABLE_TYPES
+from lenia.server.models import Start
+from lenia.server.presets import default_config
+from lenia.server.births import replacement_organism
 
 
 class ArenaTests(unittest.TestCase):

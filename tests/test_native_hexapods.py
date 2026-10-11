@@ -6,7 +6,7 @@ from contextlib import contextmanager
 
 from PIL import Image
 
-from server.catalog import ROOT
+from lenia.server.catalog import ROOT
 
 
 @contextmanager

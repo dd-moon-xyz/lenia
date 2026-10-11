@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "lenia-stream"
 version = "0.1.0"
@@ -14,3 +18,13 @@ dependencies = [
 
 [project.optional-dependencies]
 client = ["pygame-ce==2.5.8"]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["lenia*"]
+
+[tool.setuptools.package-data]
+"lenia.server" = ["viewer.html"]

@@ -1,19 +1,19 @@
 .PHONY: gif video server client client-record core-build core-run devcontainer-build app-build app-run app-up app-stop app-restart
 
 gif:
-	uv run python record_hexapod_cuda.py
+	uv run python -m lenia.scripts.record_hexapod_cuda
 
 video:
-	uv run python record_hexapod_cuda.py --output resources/hexapod/propulsion.mp4 --speed 5 --story
+	uv run python -m lenia.scripts.record_hexapod_cuda --output resources/hexapod/propulsion.mp4 --speed 5 --story
 
 server:
-	uv run uvicorn server.app:app --host 0.0.0.0 --port 9876 --workers 1 --ws-max-size 65536
+	uvicorn lenia.server.app:app --host 0.0.0.0 --port 9876 --workers 1 --ws-max-size 65536
 
 client:
-	uv run --extra client client.py --url ws://127.0.0.1:9876/ws
+	uv run --extra client python -m lenia.client.client --url ws://127.0.0.1:9876/ws
 
 client-record:
-	uv run --extra client client.py --url ws://127.0.0.1:9876/ws --record animation.mp4
+	uv run --extra client python -m lenia.client.client --url ws://127.0.0.1:9876/ws --record animation.mp4
 
 
 core-build:

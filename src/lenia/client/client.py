@@ -9,7 +9,7 @@ import pygame
 from websockets.asyncio.client import connect
 from websockets.exceptions import WebSocketException
 
-from server.presets import default_config
+from lenia.server.presets import default_config
 
 DEFAULT_CONFIG = default_config()
 
@@ -43,11 +43,33 @@ class VideoRecorder:
 @asynccontextmanager
 async def record_video(path: Path, fps: int):
     process = await asyncio.create_subprocess_exec(
-        "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
-        "-f", "image2pipe", "-framerate", str(fps), "-c:v", "mjpeg", "-i", "pipe:0",
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
-        "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "18",
-        "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(path.resolve()),
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-f",
+        "image2pipe",
+        "-framerate",
+        str(fps),
+        "-c:v",
+        "mjpeg",
+        "-i",
+        "pipe:0",
+        "-vf",
+        "scale=1080:1920:force_original_aspect_ratio=decrease:flags=lanczos,pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,setsar=1",
+        "-an",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "18",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        str(path.resolve()),
         stdin=asyncio.subprocess.PIPE,
     )
 
@@ -70,8 +92,13 @@ async def record_video(path: Path, fps: int):
             raise ValueError(f"Video recording failed (FFmpeg exit {code})")
 
 
-async def display_stream(url: str, config: dict, commands: asyncio.Queue, record: Path | None = None) -> None:
-    async with connect(url, max_size=4 * 1024 * 1024, compression=None) as websocket, AsyncExitStack() as recording:
+async def display_stream(
+    url: str, config: dict, commands: asyncio.Queue, record: Path | None = None
+) -> None:
+    async with (
+        connect(url, max_size=4 * 1024 * 1024, compression=None) as websocket,
+        AsyncExitStack() as recording,
+    ):
         video = None
         await websocket.send(json.dumps(config))
         async for message in websocket:
@@ -82,9 +109,13 @@ async def display_stream(url: str, config: dict, commands: asyncio.Queue, record
 
                 if status.get("status") == "started":
                     pygame.display.set_mode((status["size"], status["size"]))
-                    pygame.display.set_caption("Lenia stream — Hold Space/C outward, V inward, Esc to quit")
+                    pygame.display.set_caption(
+                        "Lenia stream — Hold Space/C outward, V inward, Esc to quit"
+                    )
                     if record is not None:
-                        video = await recording.enter_async_context(record_video(record, config.get("fps", 20)))
+                        video = await recording.enter_async_context(
+                            record_video(record, config.get("fps", 20))
+                        )
 
                     await websocket.send("next")
 
@@ -107,28 +138,43 @@ async def run(url: str, config: dict, record: Path | None = None) -> None:
     pygame.display.set_caption("Lenia stream — connecting…")
     commands = asyncio.Queue()
     held = {}
-    steering_keys = {pygame.K_SPACE: "outward", pygame.K_c: "outward", pygame.K_v: "inward_fast"}
+    steering_keys = {
+        pygame.K_SPACE: "outward",
+        pygame.K_c: "outward",
+        pygame.K_v: "inward_fast",
+    }
     stream = asyncio.create_task(display_stream(url, config, commands, record))
     try:
         while not stream.done():
             events = pygame.event.get()
             if any(
-                event.type == pygame.QUIT or (event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE)
+                event.type == pygame.QUIT
+                or (
+                    event.type == pygame.KEYDOWN
+                    and event.key == pygame.K_ESCAPE
+                )
                 for event in events
             ):
-
                 return
 
             if config.get("boundary") == "circle":
                 for event in events:
-                    if event.type in {pygame.KEYDOWN, pygame.KEYUP} and event.key in steering_keys:
-                        if event.type == pygame.KEYDOWN and event.key not in held:
+                    if (
+                        event.type in {pygame.KEYDOWN, pygame.KEYUP}
+                        and event.key in steering_keys
+                    ):
+                        if (
+                            event.type == pygame.KEYDOWN
+                            and event.key not in held
+                        ):
                             held[event.key] = steering_keys[event.key]
                             commands.put_nowait(held[event.key])
 
                         if event.type == pygame.KEYUP and event.key in held:
                             del held[event.key]
-                            commands.put_nowait(next(reversed(held.values()), "inward"))
+                            commands.put_nowait(
+                                next(reversed(held.values()), "inward")
+                            )
 
                     if event.type == pygame.WINDOWFOCUSLOST:
                         held.clear()
@@ -146,10 +192,22 @@ async def run(url: str, config: dict, record: Path | None = None) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Display a Lenia WebSocket animation in pygame")
-    parser.add_argument("--url", default="ws://127.0.0.1:8000/ws", help="Server WebSocket URL")
-    parser.add_argument("--config", type=Path, help="JSON file containing the server start configuration")
-    parser.add_argument("--record", type=Path, help="Record received frames to an MP4 video (requires FFmpeg)")
+    parser = argparse.ArgumentParser(
+        description="Display a Lenia WebSocket animation in pygame"
+    )
+    parser.add_argument(
+        "--url", default="ws://127.0.0.1:8000/ws", help="Server WebSocket URL"
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        help="JSON file containing the server start configuration",
+    )
+    parser.add_argument(
+        "--record",
+        type=Path,
+        help="Record received frames to an MP4 video (requires FFmpeg)",
+    )
     args = parser.parse_args()
     try:
         config = DEFAULT_CONFIG

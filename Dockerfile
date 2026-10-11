@@ -15,6 +15,8 @@ ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    python3.14 \
+    python3.14-dev \
     build-essential \
     g++-14 \
     cmake \
@@ -37,11 +39,15 @@ ENV CUDAHOSTCXX=g++-14
 
 COPY --from=uv_source /uv /uvx /bin/
 ENV UV_LINK_MODE=copy
-ENV UV_PYTHON_INSTALL_DIR=/opt/python
+ENV UV_SYSTEM_PYTHON=1
+RUN rm /usr/lib/python3.14/EXTERNALLY-MANAGED \
+    && update-alternatives --install /usr/bin/python python /usr/bin/python3.14 1
 WORKDIR /src
 COPY pyproject.toml uv.lock .python-version ./
-RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --no-dev
-ENV PATH="/src/.venv/bin:${PATH}"
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv export --locked --no-dev --no-emit-project --format requirements-txt -o /tmp/requirements.txt \
+    && uv pip install --system -r /tmp/requirements.txt \
+    && rm /tmp/requirements.txt
 
 FROM core AS devcontainer
 
@@ -57,7 +63,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 WORKDIR /workspace
 ENV SHELL=/usr/bin/zsh
-ENV UV_PROJECT_ENVIRONMENT=/src/.venv
 
 FROM core AS app
 
@@ -69,6 +74,7 @@ RUN cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
 
 COPY resources/animals_dim.csv resources/consolas.ttf ./resources/
 COPY shaders ./shaders
-COPY server ./server
+COPY src ./src
+RUN --mount=type=cache,target=/root/.cache/uv uv pip install --system -e . --no-deps
 EXPOSE 9876
-CMD ["uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "9876", "--workers", "1", "--ws-max-size", "65536"]
+CMD ["uvicorn", "lenia.server.app:app", "--host", "0.0.0.0", "--port", "9876", "--workers", "1", "--ws-max-size", "65536"]

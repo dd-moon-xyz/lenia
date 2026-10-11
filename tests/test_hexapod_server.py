@@ -2,9 +2,9 @@ import unittest
 
 from pydantic import ValidationError
 
-from server.catalog import ANIMALS
-from server.models import Start
-from server.presets import default_config
+from lenia.server.catalog import ANIMALS
+from lenia.server.models import Start
+from lenia.server.presets import default_config
 
 
 class HexapodServerTests(unittest.IsolatedAsyncioTestCase):

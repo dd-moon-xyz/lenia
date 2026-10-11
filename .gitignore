@@ -4,6 +4,7 @@ resources/figs
 .vscode/
 .venv
 __pycache__/
+*.egg-info/
 *.mp4
 *.claude
 uv.lock/

@@ -10,8 +10,8 @@ import uvicorn
 from PIL import Image
 from websockets.asyncio.client import connect
 
-from server.app import app
-from server.presets import default_config
+from lenia.server.app import app
+from lenia.server.presets import default_config
 
 WORKER = """
 import sys
@@ -71,7 +71,7 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
             processes[:] = [process]
             return process
 
-        with self.assertLogs("uvicorn.error", level="INFO") as logs, patch("server.worker.asyncio.create_subprocess_exec", worker):
+        with self.assertLogs("uvicorn.error", level="INFO") as logs, patch("lenia.server.worker.asyncio.create_subprocess_exec", worker):
             async with connect(self.url) as viewer:
                 await viewer.send(json.dumps({"action": "start", "size": 256, "organisms": [{"type": 0}]}))
                 self.assertEqual(json.loads(await viewer.recv())["status"], "started")
@@ -100,7 +100,7 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
             commands[:] = args
             return await launch(sys.executable, "-u", "-c", WORKER, *args[1:], **kwargs)
 
-        with patch("server.worker.asyncio.create_subprocess_exec", worker):
+        with patch("lenia.server.worker.asyncio.create_subprocess_exec", worker):
             async with connect(self.url) as viewer:
                 await viewer.send(json.dumps(default_config()))
                 self.assertEqual(json.loads(await viewer.recv())["status"], "started")
@@ -143,7 +143,7 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
             "organisms": [{"type": index, "velocity": 20.0} for index in (index % 7 for index in range(100))],
         }
 
-        with patch("server.worker.asyncio.create_subprocess_exec", worker):
+        with patch("lenia.server.worker.asyncio.create_subprocess_exec", worker):
             async with connect(self.url) as viewer:
                 await viewer.send(json.dumps(config))
                 self.assertEqual(json.loads(await viewer.recv())["status"], "started")
@@ -166,7 +166,7 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
         async def failed_worker(*args, **kwargs):
             return await launch(sys.executable, "-c", "raise SystemExit(1)", **kwargs)
 
-        with patch("server.worker.asyncio.create_subprocess_exec", failed_worker):
+        with patch("lenia.server.worker.asyncio.create_subprocess_exec", failed_worker):
             async with connect(self.url) as viewer:
                 await viewer.send(json.dumps({"action": "start", "organisms": [{"type": 0}]}))
                 self.assertIn("failed to start", json.loads(await viewer.recv())["error"])
@@ -181,7 +181,7 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
             return process
 
         config = {"action": "start", "boundary": "circle", "fps": 60, "organisms": [{"type": 0}]}
-        with self.assertLogs("uvicorn.error", level="INFO") as logs, patch("server.worker.asyncio.create_subprocess_exec", worker):
+        with self.assertLogs("uvicorn.error", level="INFO") as logs, patch("lenia.server.worker.asyncio.create_subprocess_exec", worker):
             async with connect(self.url) as viewer:
                 await viewer.send(json.dumps(config))
                 self.assertEqual(json.loads(await viewer.recv())["status"], "started")

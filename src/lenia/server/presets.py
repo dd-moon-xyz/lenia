@@ -1,7 +1,7 @@
 import math
 import random
 
-from server.catalog import ANIMALS
+from lenia.server.catalog import ANIMALS
 
 __all__ = ["default_config"]
 

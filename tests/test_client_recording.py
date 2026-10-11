@@ -2,7 +2,7 @@ import importlib.util
 import unittest
 
 if importlib.util.find_spec("pygame") is not None:
-    from client import VideoRecorder
+    from lenia.client.client import VideoRecorder
 
 
 class VideoWriter:

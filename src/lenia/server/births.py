@@ -1,7 +1,7 @@
 import random
 
-from server.catalog import ANIMALS, AVAILABLE_TYPES
-from server.models import Organism
+from lenia.server.catalog import ANIMALS, AVAILABLE_TYPES
+from lenia.server.models import Organism
 
 __all__ = ["replacement_organism"]
 

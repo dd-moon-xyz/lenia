@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import patch
 
 if importlib.util.find_spec("pygame") is not None:
-    import client
+    from lenia.client import client
     import pygame
 
 

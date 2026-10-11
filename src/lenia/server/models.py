@@ -2,8 +2,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from server.catalog import ANIMALS, AVAILABLE_TYPES
-from server.velocity import normalize_velocities
+from lenia.server.catalog import ANIMALS, AVAILABLE_TYPES
+from lenia.server.velocity import normalize_velocities
 
 __all__ = ["Organism", "Start"]
 

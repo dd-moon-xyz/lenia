@@ -3,10 +3,10 @@ import math
 import unittest
 from unittest.mock import patch
 
-from server.arena import CircularArena
-from server.catalog import ANIMALS, AVAILABLE_TYPES
-from server.births import replacement_organism
-from server.models import Start
+from lenia.server.arena import CircularArena
+from lenia.server.catalog import ANIMALS, AVAILABLE_TYPES
+from lenia.server.births import replacement_organism
+from lenia.server.models import Start
 
 
 class FakeWorker:
@@ -99,7 +99,7 @@ class BirthTests(unittest.IsolatedAsyncioTestCase):
             replacement_organism(512, set(range(len(ANIMALS))))
 
     def test_birth_pool_includes_all_types_in_the_intervals(self):
-        with patch("server.births.random.choice", side_effect=lambda candidates: candidates[0]) as choose:
+        with patch("lenia.server.births.random.choice", side_effect=lambda candidates: candidates[0]) as choose:
             replacement_organism(1024, {0, 1, 2})
 
         candidates = choose.call_args_list[0].args[0]

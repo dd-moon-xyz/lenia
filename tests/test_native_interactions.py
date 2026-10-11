@@ -2,8 +2,8 @@ import asyncio
 import os
 import unittest
 
-from server.models import Start
-from server.worker import simulation_worker
+from lenia.server.models import Start
+from lenia.server.worker import simulation_worker
 
 
 @unittest.skipUnless(os.environ.get("LENIA_GPU_TESTS") == "1", "Requires CUDA/OpenGL desktop session")

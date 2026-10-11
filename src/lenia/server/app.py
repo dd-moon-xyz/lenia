@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from server.routes import router
+from lenia.server.routes import router
 
 __all__ = ["app"]
 

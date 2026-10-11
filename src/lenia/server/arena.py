@@ -3,11 +3,11 @@ import logging
 import math
 import random
 
-from server.births import replacement_organism
-from server.frames import encode_frame
-from server.models import Organism, Start
-from server.catalog import ANIMALS
-from server.velocity import normalize_velocities
+from lenia.server.births import replacement_organism
+from lenia.server.catalog import ANIMALS
+from lenia.server.frames import encode_frame
+from lenia.server.models import Organism, Start
+from lenia.server.velocity import normalize_velocities
 
 __all__ = ["CircularArena"]
 
@@ -34,12 +34,16 @@ class CircularArena:
             if index in self.pending:
                 continue
 
-            self.dead_frames[index] = self.dead_frames[index] + 1 if mass <= 0.001 else 0
+            self.dead_frames[index] = (
+                self.dead_frames[index] + 1 if mass <= 0.001 else 0
+            )
 
             if self.dead_frames[index] >= 5:
                 self.pending[index] = asyncio.create_task(self.replace(index))
 
-        frame = await asyncio.to_thread(encode_frame, raw, self.config.size, self.config.pixel_size)
+        frame = await asyncio.to_thread(
+            encode_frame, raw, self.config.size, self.config.pixel_size
+        )
         interval = 1 / self.config.fps
         if self.deadline is None or started - self.deadline > interval:
             self.deadline = started
@@ -50,15 +54,27 @@ class CircularArena:
 
     async def replace(self, index: int) -> None:
         logger = logging.getLogger("uvicorn.error")
-        logger.info("Organism died: slot=%s type=%s", index, self.organisms[index].type)
-        organism = Organism(type=len(ANIMALS), scale=1) if self.config.simulation == "hexapod" else replacement_organism(self.config.size)
+        logger.info(
+            "Organism died: slot=%s type=%s", index, self.organisms[index].type
+        )
+        organism = (
+            Organism(type=len(ANIMALS), scale=1)
+            if self.config.simulation == "hexapod"
+            else replacement_organism(self.config.size)
+        )
         self.organisms[index] = organism
         if self.config.simulation != "hexapod":
             normalize_velocities(self.organisms)
         angle = random.uniform(0, 2 * math.pi)
         await self.worker.replace_organism(index, organism, angle)
         self.dead_frames[index] = 0
-        logger.info("Organism born outside visible circle: slot=%s type=%s scale=%s velocity=%.1f", index, organism.type, organism.scale, organism.velocity)
+        logger.info(
+            "Organism born outside visible circle: slot=%s type=%s scale=%s velocity=%.1f",
+            index,
+            organism.type,
+            organism.scale,
+            organism.velocity,
+        )
 
     async def redirect(self, outward: bool, boosted: bool = False) -> None:
         await self.worker.redirect(outward, boosted)
