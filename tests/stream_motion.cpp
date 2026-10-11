@@ -48,7 +48,7 @@ int main() {
         const float inward = -(normal.x * velocity.x + normal.y * velocity.y);
         const float tangent = normal.x * velocity.y - normal.y * velocity.x;
         if (std::abs(std::hypot(velocity.x, velocity.y) - 25.f) > 0.001f || inward < 17.f ||
-            (504.f + 48.f) * std::abs(tangent) / 25.f >= 504.f * 0.9f) return 8;
+            (520.f + 48.f) * std::abs(tangent) / 25.f >= 512.f) return 8;
         minimumOffset = std::min(minimumOffset, tangent / 25.f);
         maximumOffset = std::max(maximumOffset, tangent / 25.f);
     }
@@ -78,16 +78,16 @@ int main() {
             std::abs(std::hypot(velocity.x, velocity.y) - 100.f) > 0.01f) return 2;
     }
     // A birth begins outside the visible circle and travels inward.
-    constexpr float center = 512.f, limit = 504.f, spriteRadius = 80.f;
+    constexpr float center = 512.f, limit = 520.f, spriteRadius = 80.f;
     position = {center + limit + spriteRadius, center};
     velocity = {-215.f, 0.f};
     Lenia::advanceStreamMotion(position, velocity, 1.f / 60.f, center, limit + spriteRadius);
-    if (position.x - center - spriteRadius <= limit * 0.9f || velocity.x >= 0.f) return 3;
+    if (position.x - center - spriteRadius <= center || velocity.x >= 0.f) return 3;
     // Reflection starts only once the entire organism is beyond the visible circle.
     position = {center + limit + spriteRadius - 1.f, center};
     velocity = {215.f, 0.f};
     Lenia::advanceStreamMotion(position, velocity, 1.f / 60.f, center, limit + spriteRadius);
-    if (velocity.x >= 0.f || position.x - center - spriteRadius <= limit * 0.9f) return 4;
+    if (velocity.x >= 0.f || position.x - center - spriteRadius <= center) return 4;
     // Angled trajectories preserve velocity and stay inside the turning boundary.
     position = {center, center};
     velocity = {123.f, -170.f};

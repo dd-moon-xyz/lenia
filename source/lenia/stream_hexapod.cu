@@ -64,7 +64,7 @@ namespace {
             float2 center = make_float2(size * .5f / w.zoom, size * .5f / w.zoom);
             float2 radial = sub(w.position, center);
             float desired = w.trajectory;
-            float boundary = size * .5f - 8.f + 700.f * w.zoom * .707107f;
+            float boundary = size * .5f + 8.f + 700.f * w.zoom * .707107f;
             float2 travel = make_float2(cosf(desired), sinf(desired));
             float distance = norm(radial);
             float projection = travel.x * radial.x + travel.y * radial.y;
@@ -259,7 +259,7 @@ namespace {
         if (x >= size || y >= size) return;
         float3 rgb = make_float3(0,0,0);
         float2 point = make_float2(x + .5f, y + .5f), center = make_float2(size * .5f, size * .5f);
-        if (preview || norm(sub(point, center)) < (size * .5f - 8.f) * .9f) {
+        if (preview || norm(sub(point, center)) < size * .5f) {
             for (int i = 0; i < count; ++i) {
                 const Walker& w = walkers[i];
                 float2 local = sub(point, mul(w.position, w.zoom));
@@ -330,7 +330,7 @@ namespace {
         if (preview) { w.zoom = size / 1050.f; w.position = make_float2(0.f, 0.f); w.previous = w.position; w.heading = -PI * .25f; w.palette = 0; }
         w.health = 1.f;
         if (spawning) {
-            float radius = (size * .5f - 8.f) * .9f + 700.f * w.zoom * .707107f + 8.f;
+            float radius = size * .5f + 700.f * w.zoom * .707107f + 8.f;
             w.position = make_float2((size * .5f + radius * cosf(spawnAngle)) / w.zoom,
                                     (size * .5f + radius * sinf(spawnAngle)) / w.zoom);
             w.previous = w.position;

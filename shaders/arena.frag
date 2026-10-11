@@ -17,13 +17,13 @@ float sampleState(ivec2 p) {
 
 void main() {
     vec2 point = vec2(gl_FragCoord.x, float(worldSize) - gl_FragCoord.y);
-    float radius = (float(worldSize) * 0.5 - 8.0) * 0.9;
+    float radius = float(worldSize) * 0.5;
     float distance = length(point - vec2(float(worldSize) * 0.5));
     if (background) {
         fragColor = vec4(0.0, 0.0, 0.0, 1.0);
         return;
     }
-    if (distance > radius - 2.0) discard;
+    if (distance > radius) discard;
     vec2 delta = (point - position) / fit;
     float c = cos(angle), s = sin(angle);
     vec2 source = vec2(c * delta.x + s * delta.y, -s * delta.x + c * delta.y) + sourceCenter;

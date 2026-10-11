@@ -129,7 +129,7 @@ void Lenia::StreamArena::redirect(bool outward, bool boosted) {
 
 void Lenia::StreamArena::advance(Slot& slot) {
     const f32 center = m_size * 0.5f;
-    const f32 radius = center - 8.f + slot.radius;
+    const f32 radius = center + 8.f + slot.radius;
     if (slot.spawning) {
         slot.position = {center + radius * std::cos(slot.spawnAngle), center + radius * std::sin(slot.spawnAngle)};
         slot.spawning = false;
