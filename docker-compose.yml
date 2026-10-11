@@ -1,0 +1,37 @@
+services:
+    lenia-core:
+        image: lenia-core
+        container_name: lenia-core
+        build:
+            context: .
+            dockerfile: Dockerfile
+            target: core
+        networks:
+            - lenia
+
+    lenia-app:
+        image: lenia-app
+        container_name: lenia-app
+        build:
+            context: .
+            dockerfile: Dockerfile
+            target: app
+        ports:
+            - "9876:9876"
+        environment:
+            NVIDIA_DRIVER_CAPABILITIES: compute,utility
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [gpu]
+        restart: unless-stopped
+        networks:
+            - lenia
+
+networks:
+    lenia:
+        name: lenia
+        driver: bridge

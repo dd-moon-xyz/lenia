@@ -1,4 +1,4 @@
-.PHONY: gif video server client
+.PHONY: gif video server client client-record core-build core-run app-build app-run app-up app-stop app-restart
 
 gif:
 	uv run python record_hexapod_cuda.py
@@ -14,3 +14,25 @@ client:
 
 client-record:
 	uv run --extra client client.py --url ws://127.0.0.1:9876/ws --record animation.mp4
+
+
+core-build:
+	docker compose build lenia-core
+
+core-run:
+	docker compose run --rm lenia-core
+
+
+app-build:
+	docker compose build lenia-app
+
+app-run: app-build
+	docker compose run --rm --service-ports lenia-app
+
+app-up: app-build
+	docker compose up -d lenia-app
+
+app-stop:
+	docker compose stop lenia-app
+
+app-restart: app-stop app-up

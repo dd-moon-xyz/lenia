@@ -50,6 +50,8 @@ uv sync --locked
 uv run uvicorn server.app:app --host 0.0.0.0 --port 9876 --workers 1 --ws-max-size 65536
 ```
 
+The [Dockerfile](../Dockerfile) and [Compose services](../docker-compose.yml) follow the `por` core/app structure. Run `git submodule update --init --recursive` before the first image build. With Docker Compose and NVIDIA Container Toolkit configured on the host, use `make app-run` to build and run the API in the foreground, or `make app-up` to build and start it in the background. Both publish port 9876. Use `make app-stop` to stop it and `make app-restart` to rebuild and restart it. The image builds the CUDA worker with CUDA 12.6.3 and installs the locked Python 3.14 dependencies; no host Python or CUDA Toolkit installation is needed. The host still needs a compatible NVIDIA driver and GPU. The API container runs the default hexapod simulation without an X11 connection. Use `make core-build` to build only the shared toolchain and Python environment.
+
 Open `http://<server-LAN-IP>:9876/` on the viewing device. Both devices must be able to reach port 9876. The viewer provides organism selection, editable JSON configuration, start/restart, pause/resume, and stop. This initial server is intended for a trusted local network and has no authentication.
 
 A small [pygame client](../client.py) can display the stream in a desktop window on another device. Run from the project root on that device:
