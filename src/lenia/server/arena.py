@@ -42,7 +42,7 @@ class CircularArena:
                 self.pending[index] = asyncio.create_task(self.replace(index))
 
         frame = await asyncio.to_thread(
-            encode_frame, raw, self.config.size, self.config.pixel_size,
+            encode_frame, raw, self.worker.frame_size, self.config.pixel_size,
             self.config.output_size,
         )
         interval = 1 / self.config.fps

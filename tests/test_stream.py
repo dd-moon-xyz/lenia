@@ -3,7 +3,9 @@ import io
 import json
 import socket
 import sys
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 import uvicorn
@@ -19,6 +21,7 @@ import struct
 arena = any(option in sys.argv for option in ('--stream-arena', '--stream-hexapod'))
 header = sys.stdin.buffer.readline().split()
 size, count = int(header[0]), int(header[-1])
+output_size = size
 for _ in range(count):
     sys.stdin.buffer.readline()
 print('READY', flush=True)
@@ -28,6 +31,12 @@ while True:
     if not command:
         break
     if command in b' \\n':
+        continue
+    if command == b's':
+        assert '--stream-hexapod' in sys.argv
+        output_size = int(sys.stdin.buffer.readline())
+        assert 1 <= output_size <= size
+        print('READY', flush=True)
         continue
     if command in (b'o', b'i', b'b'):
         print('READY', flush=True)
@@ -43,13 +52,17 @@ while True:
         mass = 0.0 if '--die-once' in sys.argv and frames <= 5 else 100.0
         sys.stdout.buffer.write(struct.pack(f'={count}f', *([mass] * count)))
     red = frames * 40 if '--count-frames' in sys.argv else 200
-    sys.stdout.buffer.write(bytes([red, 30, 10]) * size ** 2)
+    sys.stdout.buffer.write(bytes([red, 30, 10]) * output_size ** 2)
     sys.stdout.buffer.flush()
 """
 
 
 class StreamTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
+        # Fake native workers need a working directory, not a CUDA build.
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        (root / "build").mkdir()
+        self.enterContext(patch("lenia.server.worker.ROOT", root))
         self.listener = socket.socket()
         self.listener.bind(("127.0.0.1", 0))
         self.url = f"ws://127.0.0.1:{self.listener.getsockname()[1]}/ws"

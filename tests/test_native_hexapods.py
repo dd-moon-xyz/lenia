@@ -20,16 +20,30 @@ def worker(mode: str, count: int, dt: float):
         yield process
 
 
-def frame(process, count: int):
+def frame(process, count: int, size: int = 256):
     process.stdin.write(b"n")
     process.stdin.flush()
     masses = struct.unpack(f"={count}f", process.stdout.read(count * 4))
-    image = Image.frombytes("RGB", (256, 256), process.stdout.read(256 * 256 * 3))
+    image = Image.frombytes("RGB", (size, size), process.stdout.read(size * size * 3))
     return masses, image
 
 
 @unittest.skipUnless(os.environ.get("LENIA_GPU_TESTS") == "1", "Requires CUDA GPU")
 class NativeHexapodTests(unittest.TestCase):
+    def test_resized_frames_preserve_metadata_and_command_alignment(self):
+        with worker("--stream-hexapod", 1, .1) as process:
+            for size in (120, 1, 256):
+                process.stdin.write(f"s {size}\n".encode())
+                process.stdin.flush()
+                self.assertEqual(process.stdout.readline(), b"READY\n")
+                for _ in range(2):
+                    masses, image = frame(process, 1, size)
+                    self.assertEqual(image.size, (size, size))
+                    self.assertGreater(masses[0], 0)
+                process.stdin.write(b"i")
+                process.stdin.flush()
+                self.assertEqual(process.stdout.readline(), b"READY\n")
+
     def test_overlapping_bodies_fade_to_death(self):
         with worker("--stream-hexapod-preview", 2, .005) as process:
             initial, _ = frame(process, 2)
