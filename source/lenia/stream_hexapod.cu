@@ -29,11 +29,10 @@ namespace {
         return make_float2(cosf(angle) * a.x - sinf(angle) * a.y, sinf(angle) * a.x + cosf(angle) * a.y);
     }
     __device__ float clip(float v, float lo, float hi) { return fminf(hi, fmaxf(lo, v)); }
-    __device__ float structureScale(const Walker& w) { return .35f + .65f * w.health; }
     __device__ float2 root(const Walker& w, int arm) {
         int level = arm % 3;
         float side = arm < 3 ? -1.f : 1.f;
-        return add(w.position, rotate(mul(make_float2(side * 27.712813f * (level == 0 ? 1.f : .7f), -16.f + level * 16.f), structureScale(w)), w.heading));
+        return add(w.position, rotate(make_float2(side * 27.712813f * (level == 0 ? 1.f : .7f), -16.f + level * 16.f), w.heading));
     }
     __device__ float2 rest(int arm) {
         const float angles[] = {.8f, 1.1f, 1.45f};
@@ -120,7 +119,7 @@ namespace {
         }
         for (int arm = 0; arm < 6; ++arm) {
             float2 r = root(w, arm), offset = sub(w.feet[arm].position, r);
-            float scale = structureScale(w), length = LENGTH * scale;
+            float length = LENGTH;
             float fold = (1.f - w.health) * (1.f - w.health);
             float2 tucked = rotate(make_float2((arm < 3 ? -1.f : 1.f) * 12.f, 18.f), w.heading);
             offset = add(mul(offset, 1.f - fold), mul(tucked, fold));
@@ -179,7 +178,7 @@ namespace {
                 state = fmaxf(state, outer + inner);
             }
         }
-        float2 local = mul(rotate(p, -w.heading), 1.f / structureScale(w));
+        float2 local = rotate(p, -w.heading);
         float head = tissue(hexDistance(add(local, make_float2(0.f, 32.f)), 32.f), 2.f);
         float nucleus = tissue(hexDistance(add(local, make_float2(-1.5f * sinf(w.time * 2.2f), 32.f)), 56.f / 3.f), 2.f);
         state = fmaxf(state, head * .51f + nucleus * (.463f + .039f * sinf(w.time * 2.2f)));
@@ -329,7 +328,7 @@ namespace {
         Walker& w = walkers[index];
         float exposure = clip(totals[index].x / fmaxf(totals[index].y,.001f),0.f,1.f);
         w.stress = fminf(1.f,w.stress + dt * exposure * 3.f);
-        w.health = fmaxf(0.f,w.health - dt * (.08f * w.stress + .30f * exposure));
+        w.health = fmaxf(0.f,w.health - dt * (.10f * w.stress + .375f * exposure));
         masses[index] = totals[index].y * w.health;
     }
     Walker initialize(int size, int scale, float x, float y, bool preview, bool spawning,
