@@ -77,6 +77,21 @@ int main() {
         if (std::hypot(position.x - 50.f, position.y - 50.f) > 45.001f ||
             std::abs(std::hypot(velocity.x, velocity.y) - 100.f) > 0.01f) return 2;
     }
+    // Outward movement stops at the boundary without reflecting or losing speed.
+    for (float multiplier : {1.f, 2.f, 10.f}) {
+        position = {85.f, 50.f};
+        velocity = {100.f * multiplier, 0.f};
+        for (int step = 0; step < 600; ++step)
+            Lenia::advanceStreamMotion(position, velocity, 1.f / 60.f, 50.f, 45.f, true);
+        if (std::abs(position.x - 95.f) > 0.001f || velocity.x <= 0.f) return 16;
+        // Steering jitter cannot pull an organism off the boundary in outward mode.
+        velocity = {-100.f * multiplier, 0.f};
+        Lenia::advanceStreamMotion(position, velocity, .1f, 50.f, 45.f, true);
+        if (std::abs(position.x - 95.f) > 0.001f) return 17;
+        // Inward mode releases the held organism immediately.
+        Lenia::advanceStreamMotion(position, velocity, .01f, 50.f, 45.f, false);
+        if (position.x >= 95.f) return 18;
+    }
     // A birth begins outside the visible circle and travels inward.
     constexpr float center = 512.f, limit = 520.f, spriteRadius = 80.f;
     position = {center + limit + spriteRadius, center};

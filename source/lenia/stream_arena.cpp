@@ -152,7 +152,7 @@ void Lenia::StreamArena::advance(Slot& slot) {
         const f32 target = std::atan2(delta.y, delta.x) + (m_outward ? 0.f : 3.14159265359f) + slot.steeringOffset;
         steerStreamVelocity(slot.velocity, target, 1.f / m_fps);
     }
-    advanceStreamMotion(slot.position, slot.velocity, 1.f / m_fps, center, radius);
+    advanceStreamMotion(slot.position, slot.velocity, 1.f / m_fps, center, radius, m_outward);
 }
 
 std::vector<u8> Lenia::StreamArena::frame() {

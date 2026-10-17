@@ -56,10 +56,14 @@ namespace Lenia {
         velocity = {speed * std::cos(angle), speed * std::sin(angle)};
     }
 
-    inline void advanceStreamMotion(glm::vec2& position, glm::vec2& velocity, float dt, float center, float radius) {
+    inline void advanceStreamMotion(glm::vec2& position, glm::vec2& velocity, float dt, float center, float radius, bool outward = false) {
         glm::vec2 delta = position - glm::vec2(center);
         const float distance = std::hypot(delta.x, delta.y);
         if (distance > radius) delta *= radius / distance;
+        if (outward && distance >= radius - 1e-4f) {
+            position = glm::vec2(center) + delta;
+            return;
+        }
         float remaining = dt;
         for (int iteration = 0; iteration < 8 && remaining > 1e-7f; ++iteration) {
             const float speedSquared = velocity.x * velocity.x + velocity.y * velocity.y;
@@ -69,7 +73,7 @@ namespace Lenia {
             const float travel = std::min(remaining, hit);
             delta += velocity * travel;
             remaining -= travel;
-            if (remaining <= 1e-7f) break;
+            if (remaining <= 1e-7f || outward) break;
             const float length = std::hypot(delta.x, delta.y);
             if (length == 0.f) break;
             const glm::vec2 normal = delta / length;

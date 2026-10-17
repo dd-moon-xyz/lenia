@@ -52,7 +52,7 @@ namespace {
         foot.reachBias = 24.f * randomUnit(foot);
         foot.lateralBias = (randomUnit(foot) - .5f) * 32.f;
     }
-    __global__ void advance(Walker* walkers, int count, int size, float dt, bool preview) {
+    __global__ void advance(Walker* walkers, int count, int size, float dt, bool preview, bool outward) {
         int index = blockIdx.x * blockDim.x + threadIdx.x;
         if (index >= count) return;
         Walker& w = walkers[index];
@@ -68,7 +68,9 @@ namespace {
             float2 travel = make_float2(cosf(desired), sinf(desired));
             float distance = norm(radial);
             float projection = travel.x * radial.x + travel.y * radial.y;
-            if (!preview && distance * w.zoom >= boundary && projection > 0.f) {
+            // Keep the walker at the boundary until inward movement resumes.
+            if (!preview && outward && distance * w.zoom >= boundary - 1e-4f) continue;
+            if (!preview && !outward && distance * w.zoom >= boundary && projection > 0.f) {
                 float2 reflected = sub(travel, mul(radial, 2.f * projection / (distance * distance)));
                 w.trajectory = atan2f(reflected.y, reflected.x);
                 desired = w.trajectory;
@@ -80,6 +82,12 @@ namespace {
             float alignment = fmaxf(0.f, cosf(turn));
             float speed = 48.f * w.health * w.health * alignment * contacts / (2.f + contacts);
             float2 position = add(w.position, mul(direction, speed * interval));
+            if (!preview && outward) {
+                float2 nextRadial = sub(position, center);
+                float nextDistance = norm(nextRadial);
+                if (nextDistance * w.zoom > boundary)
+                    position = add(center, mul(nextRadial, boundary / (w.zoom * nextDistance)));
+            }
             float heading = w.heading + clip(turn, -interval, interval);
             bool supported = true;
             for (int arm = 0; arm < 6; ++arm) {
@@ -455,7 +463,7 @@ int Lenia::streamHexapod(bool preview) {
             }
             if (command != 'n') return 1;
             float step = dt * movementSpeedMultiplier;
-            advance<<<(count+63)/64,64>>>(arena.walkers,count,size,step,preview);
+            advance<<<(count+63)/64,64>>>(arena.walkers,count,size,step,preview,outward);
             dim3 block(16,16), grid((RES+15)/16,(RES+15)/16,count);
             body<<<grid,block>>>(arena.walkers,arena.density,count);
             contact<<<count,256>>>(arena.walkers,arena.density,arena.contacts,count);
