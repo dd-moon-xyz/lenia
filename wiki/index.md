@@ -16,7 +16,7 @@ Project documentation organized as an Open Knowledge Format (OKF) v0.2 bundle.
 - [Technical overview](architecture.md)
 - [Mathematical background](mathematics.md)
 - [Python experiments](python-experiments.md)
-- [Raspberry Pi multi-sensor wiring](multisensor-raspberry-pi-wiring.md)
+- [Raspberry Pi multi-sensor wiring (client wiki)](../../lenia-client/wiki/multisensor-raspberry-pi-wiring.md)
 - [Credits](credits.md)
 
 [Project README](../README.md)
