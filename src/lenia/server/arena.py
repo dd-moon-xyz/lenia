@@ -20,6 +20,8 @@ class CircularArena:
         self.dead_frames = [0] * len(config.organisms)
         self.pending = {}
         self.deadline = None
+        self.outward = False
+        self.birth_lock = asyncio.Lock()
 
     async def frame(self) -> bytes:
         loop = asyncio.get_running_loop()
@@ -38,7 +40,7 @@ class CircularArena:
                 self.dead_frames[index] + 1 if mass <= 0.001 else 0
             )
 
-            if self.dead_frames[index] >= 5:
+            if self.dead_frames[index] >= 5 and not self.outward:
                 self.pending[index] = asyncio.create_task(self.replace(index))
 
         frame = await asyncio.to_thread(
@@ -54,6 +56,13 @@ class CircularArena:
         return frame
 
     async def replace(self, index: int) -> None:
+        # Serialize births with steering so a queued replacement cannot run
+        # after outward mode has been acknowledged by the native worker.
+        async with self.birth_lock:
+            if not self.outward:
+                await self._replace(index)
+
+    async def _replace(self, index: int) -> None:
         logger = logging.getLogger("uvicorn.error")
         logger.info(
             "Organism died: slot=%s type=%s", index, self.organisms[index].type
@@ -78,7 +87,9 @@ class CircularArena:
         )
 
     async def redirect(self, outward: bool, boosted: bool = False) -> None:
-        await self.worker.redirect(outward, boosted)
+        async with self.birth_lock:
+            await self.worker.redirect(outward, boosted)
+            self.outward = outward
 
     async def close(self) -> None:
         for task in self.pending.values():

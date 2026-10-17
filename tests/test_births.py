@@ -16,6 +16,9 @@ class FakeWorker:
         self.masses = (mass,)
         self.replacements = ()
 
+    async def redirect(self, outward, boosted=False):
+        pass
+
     async def frame(self):
         return bytes(self.config.size ** 2 * 3)
 
@@ -89,6 +92,45 @@ class BirthTests(unittest.IsolatedAsyncioTestCase):
         await asyncio.wait_for(entered.wait(), 1)
         await arena.close()
         self.assertTrue(all(task.cancelled() for task in arena.pending.values()))
+
+    async def test_outward_pauses_births_until_either_inward_command(self):
+        for simulation in ("lenia", "hexapod"):
+            for boosted in (False, True):
+                with self.subTest(simulation=simulation, boosted=boosted):
+                    config = self.config()
+                    if simulation == "hexapod":
+                        config = Start.model_validate({"action": "start", "simulation": "hexapod", "boundary": "circle", "fps": 60, "organisms": [{"type": len(ANIMALS)}]})
+                    worker = FakeWorker(config)
+                    arena = CircularArena(config, worker)
+                    try:
+                        await arena.redirect(True, True)
+                        for _ in range(7):
+                            await arena.frame()
+                        self.assertFalse(worker.replacements)
+                        self.assertFalse(arena.pending)
+                        await arena.redirect(False, boosted)
+                        for _ in range(2):
+                            await arena.frame()
+                        self.assertEqual(len(worker.replacements), 1)
+                    finally:
+                        await arena.close()
+
+    async def test_queued_replacement_checks_current_direction(self):
+        config = self.config()
+        worker = FakeWorker(config)
+        arena = CircularArena(config, worker)
+        try:
+            # A birth task created during the last inward frame may still be queued.
+            await arena.birth_lock.acquire()
+            redirect = asyncio.create_task(arena.redirect(True, True))
+            await asyncio.sleep(0)
+            birth = asyncio.create_task(arena.replace(0))
+            arena.birth_lock.release()
+            await redirect
+            await birth
+            self.assertFalse(worker.replacements)
+        finally:
+            await arena.close()
 
     def test_replacement_fits_and_uses_a_different_type(self):
         replacement = replacement_organism(512, {0, 1, 2})
