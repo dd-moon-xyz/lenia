@@ -411,7 +411,8 @@ int Lenia::streamHexapod(bool preview) {
         std::vector<unsigned char> pixels(size*size*3);
         int outputSize = size;
         std::vector<float> masses(count,100.f);
-        bool boosted = false;
+        float movementSpeedMultiplier = 1.f;
+        bool outward = false;
         std::cout << "READY\n" << std::flush;
         char command;
         while (std::cin >> command) {
@@ -423,10 +424,23 @@ int Lenia::streamHexapod(bool preview) {
                 pixels.resize(outputSize * outputSize * 3);
                 std::cout << "READY\n" << std::flush; continue;
             }
-            if (command == 'o' || command == 'i' || command == 'b') {
-                boosted = command != 'i';
-                redirect<<<(count+63)/64,64>>>(arena.walkers,count,size,command == 'o');
-                checked(cudaGetLastError());
+            if (command == 'm' || command == 'o' || command == 'u' || command == 'i' || command == 'b') {
+                bool nextOutward;
+                if (command == 'm') {
+                    int direction;
+                    if (!(std::cin >> direction >> movementSpeedMultiplier) || (direction != 0 && direction != 1) ||
+                        !std::isfinite(movementSpeedMultiplier) || movementSpeedMultiplier <= 0.f || movementSpeedMultiplier > 10.f) return 1;
+                    nextOutward = direction != 0;
+                } else {
+                    movementSpeedMultiplier = (command == 'o' || command == 'b') ? boost : 1.f;
+                    nextOutward = command == 'o' || command == 'u';
+                }
+                // A speed change must preserve current trajectories.
+                if (nextOutward != outward) {
+                    redirect<<<(count+63)/64,64>>>(arena.walkers,count,size,nextOutward);
+                    checked(cudaGetLastError());
+                    outward = nextOutward;
+                }
                 std::cout << "READY\n" << std::flush; continue;
             }
             if (command == 'r') {
@@ -440,7 +454,7 @@ int Lenia::streamHexapod(bool preview) {
                 std::cout << "READY\n" << std::flush; continue;
             }
             if (command != 'n') return 1;
-            float step = dt * (boosted ? boost : 1.f);
+            float step = dt * movementSpeedMultiplier;
             advance<<<(count+63)/64,64>>>(arena.walkers,count,size,step,preview);
             dim3 block(16,16), grid((RES+15)/16,(RES+15)/16,count);
             body<<<grid,block>>>(arena.walkers,arena.density,count);

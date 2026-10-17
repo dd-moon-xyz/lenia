@@ -107,10 +107,18 @@ class SimulationWorker:
             self.process.stdin.write(command.encode())
             await self.ready()
 
+    async def movement(self, outward: bool, speed_multiplier: float) -> None:
+        async with self.lock:
+            self.process.stdin.write(f"m {int(outward)} {speed_multiplier}\n".encode())
+            try:
+                await self.ready()
+            except RuntimeError as error:
+                raise RuntimeError("Movement command failed; rebuild the native lenia executable") from error
+
     async def redirect(self, outward: bool, boosted: bool = False) -> None:
         async with self.lock:
             self.process.stdin.write(
-                b"o" if outward else (b"b" if boosted else b"i")
+                (b"o" if boosted else b"u") if outward else (b"b" if boosted else b"i")
             )
             await self.ready()
 

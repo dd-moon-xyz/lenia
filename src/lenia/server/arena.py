@@ -86,6 +86,11 @@ class CircularArena:
             organism.velocity,
         )
 
+    async def movement(self, outward: bool, speed_multiplier: float) -> None:
+        async with self.birth_lock:
+            await self.worker.movement(outward, speed_multiplier)
+            self.outward = outward
+
     async def redirect(self, outward: bool, boosted: bool = False) -> None:
         async with self.birth_lock:
             await self.worker.redirect(outward, boosted)

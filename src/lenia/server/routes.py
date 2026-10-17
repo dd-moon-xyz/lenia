@@ -7,7 +7,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 
 from lenia.server.catalog import ANIMALS
-from lenia.server.models import Start
+from lenia.server.models import Movement, Start
 from lenia.server.presets import default_config
 from lenia.server.worker import simulation_worker
 
@@ -63,20 +63,28 @@ async def stream(websocket: WebSocket):
                     await websocket.send_json({"status": "stopped"})
                     break
 
-                if command in {"outward", "inward", "inward_fast"}:
+                if command.lstrip().startswith("{"):
+                    movement = Movement.model_validate_json(command)
+                    if config.boundary != "circle":
+                        raise ValueError("Directed trajectories require a circular arena")
+                    await worker.movement(movement.direction == "outward", movement.speed_multiplier)
+                    continue
+
+                if command in {"outward", "outward_normal", "inward", "inward_fast"}:
                     if config.boundary != "circle":
                         raise ValueError(
                             "Directed trajectories require a circular arena"
                         )
 
                     await worker.redirect(
-                        command == "outward", command != "inward"
+                        command in {"outward", "outward_normal"},
+                        command in {"outward", "inward_fast"}
                     )
                     continue
 
                 if command != "next":
                     raise ValueError(
-                        "Send 'next' for a frame, 'outward', 'inward', or 'inward_fast' to steer organisms, or 'stop' to end the simulation"
+                        "Send 'next' for a frame, a movement JSON object to set direction and speed, 'outward', 'outward_normal', 'inward', or 'inward_fast' to steer organisms, or 'stop' to end the simulation"
                     )
 
                 await websocket.send_bytes(await worker.frame())

@@ -38,7 +38,12 @@ while True:
         assert 1 <= output_size <= size
         print('READY', flush=True)
         continue
-    if command in (b'o', b'i', b'b'):
+    if command == b'm':
+        sys.stdin.buffer.readline()
+        sys.stdout.buffer.write(b'READY\\n')
+        sys.stdout.buffer.flush()
+        continue
+    if command in (b'o', b'u', b'i', b'b'):
         print('READY', flush=True)
         continue
     if command == b'r':
@@ -250,7 +255,12 @@ class StreamTests(unittest.IsolatedAsyncioTestCase):
                 await viewer.send(json.dumps(config))
                 self.assertEqual(json.loads(await viewer.recv())["status"], "started")
                 for _ in range(8):
-                    for command in ("outward", "inward_fast", "inward"):
+                    for command in (
+                        json.dumps({"action": "movement", "direction": "outward", "speed_multiplier": 1.0}),
+                        json.dumps({"action": "movement", "direction": "outward", "speed_multiplier": 2.5}),
+                        json.dumps({"action": "movement", "direction": "inward", "speed_multiplier": 0.5}),
+                        "outward_normal", "outward", "outward_normal", "inward_fast", "inward",
+                    ):
                         await viewer.send(command)
 
                     await viewer.send("next")

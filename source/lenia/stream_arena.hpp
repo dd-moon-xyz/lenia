@@ -17,6 +17,7 @@ namespace Lenia {
         std::vector<u8> frame();
         std::vector<f32> masses() const;
         void redirect(bool outward, bool boosted);
+        void movement(bool outward, f32 speedMultiplier);
         void replace(u32 index, const StreamOrganism& organism, f32 angle);
     private:
         struct Slot {
@@ -42,7 +43,7 @@ namespace Lenia {
         u32 m_size, m_fps;
         f32 m_dt, m_spaceSpeedMultiplier;
         bool m_outward = false;
-        bool m_boosted = false;
+        f32 m_movementSpeedMultiplier = 1.f;
         GLuint m_program, m_boundsProgram, m_boundsBuffer;
         void initialize(Slot& slot, const StreamOrganism& organism);
         void normalizeVelocities();

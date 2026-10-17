@@ -103,7 +103,7 @@ class BirthTests(unittest.IsolatedAsyncioTestCase):
                     worker = FakeWorker(config)
                     arena = CircularArena(config, worker)
                     try:
-                        await arena.redirect(True, True)
+                        await arena.redirect(True, boosted)
                         for _ in range(7):
                             await arena.frame()
                         self.assertFalse(worker.replacements)

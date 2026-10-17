@@ -5,7 +5,14 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from lenia.server.catalog import ANIMALS, AVAILABLE_TYPES
 from lenia.server.velocity import normalize_velocities
 
-__all__ = ["Organism", "Start"]
+__all__ = ["Movement", "Organism", "Start"]
+
+
+class Movement(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    action: Literal["movement"]
+    direction: Literal["inward", "outward"]
+    speed_multiplier: float = Field(gt=0, le=10, allow_inf_nan=False)
 
 
 class Organism(BaseModel):

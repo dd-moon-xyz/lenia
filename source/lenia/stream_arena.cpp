@@ -116,15 +116,22 @@ void Lenia::StreamArena::normalizeVelocities() {
         const auto& animal = *slot.animal;
         const f32 size = std::max(animal.m_info.m_w, animal.m_info.m_h) * animal.m_scale;
         const f32 speed = std::hypot(slot.velocity.x, slot.velocity.y);
-        slot.velocity *= ((m_boosted ? m_spaceSpeedMultiplier : 1.f) * slot.speedMultiplier * 25.f * smallest / size) / speed;
+        slot.velocity *= (m_movementSpeedMultiplier * slot.speedMultiplier * 25.f * smallest / size) / speed;
     }
 }
 
 void Lenia::StreamArena::redirect(bool outward, bool boosted) {
+    movement(outward, boosted ? m_spaceSpeedMultiplier : 1.f);
+}
+
+void Lenia::StreamArena::movement(bool outward, f32 speedMultiplier) {
+    const bool directionChanged = m_outward != outward;
     m_outward = outward;
-    m_boosted = boosted;
+    m_movementSpeedMultiplier = speedMultiplier;
     normalizeVelocities();
-    for (auto& slot : m_slots) slot.steeringTime = 0.f;
+    if (directionChanged) {
+        for (auto& slot : m_slots) slot.steeringTime = 0.f;
+    }
 }
 
 void Lenia::StreamArena::advance(Slot& slot) {
@@ -265,8 +272,17 @@ int Lenia::streamArena() {
                 std::cout << "READY\n" << std::flush;
                 continue;
             }
-            if (command == 'o' || command == 'i' || command == 'b') {
-                arena.redirect(command == 'o', command != 'i');
+            if (command == 'm') {
+                int outward;
+                f32 speedMultiplier;
+                if (!(std::cin >> outward >> speedMultiplier) || (outward != 0 && outward != 1) ||
+                    !std::isfinite(speedMultiplier) || speedMultiplier <= 0.f || speedMultiplier > 10.f) return 1;
+                arena.movement(outward != 0, speedMultiplier);
+                std::cout << "READY\n" << std::flush;
+                continue;
+            }
+            if (command == 'o' || command == 'u' || command == 'i' || command == 'b') {
+                arena.redirect(command == 'o' || command == 'u', command == 'o' || command == 'b');
                 std::cout << "READY\n" << std::flush;
                 continue;
             }
