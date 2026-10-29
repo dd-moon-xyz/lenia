@@ -30,10 +30,10 @@ devcontainer-build:
 app-build:
 	docker compose build lenia-app
 
-app-run: app-build
+app-run:
 	docker compose run --rm --service-ports lenia-app
 
-app-up: app-build
+app-up:
 	docker compose up -d lenia-app
 
 app-stop:
