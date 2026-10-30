@@ -91,6 +91,12 @@ class CircularArena:
             await self.worker.movement(outward, speed_multiplier)
             self.outward = outward
 
+    async def steer_vector(self, x: float, y: float, escape: bool, speed_multiplier: float) -> None:
+        async with self.birth_lock:
+            await self.worker.steer_vector(x, y, escape, speed_multiplier)
+            # The existing birth gate represents escape, including vector escape.
+            self.outward = escape
+
     async def redirect(self, outward: bool, boosted: bool = False) -> None:
         async with self.birth_lock:
             await self.worker.redirect(outward, boosted)

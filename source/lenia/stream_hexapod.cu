@@ -154,6 +154,10 @@ namespace {
         float2 radial = sub(mul(w.position,w.zoom),make_float2(size*.5f,size*.5f));
         w.trajectory = atan2f(radial.y,radial.x) + (outward ? 0.f : PI);
     }
+    __global__ void steerVector(Walker* walkers, int count, float heading) {
+        int index = blockIdx.x * blockDim.x + threadIdx.x;
+        if (index < count) walkers[index].trajectory = heading;
+    }
     __device__ float segmentDistance(float2 p, float2 a, float2 b) {
         float2 v = sub(b, a), d = sub(p, a);
         float t = clip((d.x * v.x + d.y * v.y) / fmaxf(1e-6f, v.x * v.x + v.y * v.y), 0.f, 1.f);
@@ -421,6 +425,8 @@ int Lenia::streamHexapod(bool preview) {
         std::vector<float> masses(count,100.f);
         float movementSpeedMultiplier = 1.f;
         bool outward = false;
+        bool vectorMode = false;
+        float vectorHeading = 0.f;
         std::cout << "READY\n" << std::flush;
         char command;
         while (std::cin >> command) {
@@ -430,6 +436,25 @@ int Lenia::streamHexapod(bool preview) {
                 arena.setOutputSize(size, requested);
                 outputSize = requested;
                 pixels.resize(outputSize * outputSize * 3);
+                std::cout << "READY\n" << std::flush; continue;
+            }
+            if (command == 'v') {
+                float x, y, speed;
+                int escape;
+                if (!(std::cin >> x >> y >> escape >> speed) ||
+                    !std::isfinite(x) || !std::isfinite(y) || fabsf(x) > 1.f || fabsf(y) > 1.f ||
+                    (x == 0.f && y == 0.f) || (escape != 0 && escape != 1) ||
+                    !std::isfinite(speed) || speed <= 0.f || speed > 10.f) return 1;
+                // JPEG encoding flips bottom-up output: simulation +Y is screen down.
+                float heading = atan2f(y, x);
+                if (!vectorMode || fabsf(remainderf(heading - vectorHeading, 2.f * PI)) > 1e-5f) {
+                    steerVector<<<(count+63)/64,64>>>(arena.walkers,count,heading);
+                    checked(cudaGetLastError());
+                }
+                vectorMode = true;
+                vectorHeading = heading;
+                outward = escape != 0;
+                movementSpeedMultiplier = speed;
                 std::cout << "READY\n" << std::flush; continue;
             }
             if (command == 'm' || command == 'o' || command == 'u' || command == 'i' || command == 'b') {
@@ -444,11 +469,12 @@ int Lenia::streamHexapod(bool preview) {
                     nextOutward = command == 'o' || command == 'u';
                 }
                 // A speed change must preserve current trajectories.
-                if (nextOutward != outward) {
+                if (vectorMode || nextOutward != outward) {
                     redirect<<<(count+63)/64,64>>>(arena.walkers,count,size,nextOutward);
                     checked(cudaGetLastError());
                     outward = nextOutward;
                 }
+                vectorMode = false;
                 std::cout << "READY\n" << std::flush; continue;
             }
             if (command == 'r') {
@@ -456,6 +482,7 @@ int Lenia::streamHexapod(bool preview) {
                 if (!(std::cin >> index >> fieldSize >> type >> scale >> x >> y >> velocity >> angle) ||
                     index < 0 || index >= count || type != 528 || scale < 1 || scale > 10 || !std::isfinite(angle)) return 1;
                 Walker replacement = initialize(size,scale,x,y,preview,true,angle,generator);
+                if (vectorMode) replacement.trajectory = vectorHeading;
                 checked(cudaMemcpy(arena.walkers + index,&replacement,sizeof(Walker),cudaMemcpyHostToDevice));
                 checked(cudaMemset(arena.wake + index * RES * RES,0,RES * RES * sizeof(float)));
                 checked(cudaMemset(arena.next + index * RES * RES,0,RES * RES * sizeof(float)));

@@ -30,6 +30,29 @@ def frame(process, count: int, size: int = 256):
 
 @unittest.skipUnless(os.environ.get("LENIA_GPU_TESTS") == "1", "Requires CUDA GPU")
 class NativeHexapodTests(unittest.TestCase):
+    def test_vector_escape_holds_outside_and_radial_inward_restores_entry(self):
+        with worker("--stream-hexapod", 1, .2) as process:
+            for command in (b'v 1 0 1 2\n', b'v 0 -1 1 2\n', b'v -0.6 0.8 0 1\n', b'v 1 0 1 2\n'):
+                process.stdin.write(command)
+                process.stdin.flush()
+                self.assertEqual(process.stdout.readline(), b'READY\n')
+                masses, _ = frame(process, 1)
+                self.assertGreater(masses[0], .001)
+            for _ in range(1200):
+                masses, image = frame(process, 1)
+            self.assertIsNone(image.getbbox())
+            process.stdin.write(b'v 1 0 1 1\n')
+            process.stdin.flush()
+            self.assertEqual(process.stdout.readline(), b'READY\n')
+            for _ in range(10):
+                _, image = frame(process, 1)
+                self.assertIsNone(image.getbbox())
+            process.stdin.write(b'i')
+            process.stdin.flush()
+            self.assertEqual(process.stdout.readline(), b'READY\n')
+            entered = any(frame(process, 1)[1].getbbox() is not None for _ in range(1200))
+            self.assertTrue(entered)
+
     def test_resized_frames_preserve_metadata_and_command_alignment(self):
         with worker("--stream-hexapod", 1, .1) as process:
             for size in (120, 1, 256):

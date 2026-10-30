@@ -115,6 +115,14 @@ class SimulationWorker:
             except RuntimeError as error:
                 raise RuntimeError("Movement command failed; rebuild the native lenia executable") from error
 
+    async def steer_vector(self, x: float, y: float, escape: bool, speed_multiplier: float) -> None:
+        async with self.lock:
+            self.process.stdin.write(f"v {x} {y} {int(escape)} {speed_multiplier}\n".encode())
+            try:
+                await self.ready()
+            except RuntimeError as error:
+                raise RuntimeError("Vector movement failed; rebuild the native lenia executable") from error
+
     async def redirect(self, outward: bool, boosted: bool = False) -> None:
         async with self.lock:
             self.process.stdin.write(

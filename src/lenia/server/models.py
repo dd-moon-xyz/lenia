@@ -8,11 +8,31 @@ from lenia.server.velocity import normalize_velocities
 __all__ = ["Movement", "Organism", "Start"]
 
 
+class MovementVector(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    x: float = Field(ge=-1, le=1, allow_inf_nan=False)
+    y: float = Field(ge=-1, le=1, allow_inf_nan=False)
+
+
 class Movement(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     action: Literal["movement"]
-    direction: Literal["inward", "outward"]
+    direction: Literal["inward", "outward", "vector"]
     speed_multiplier: float = Field(gt=0, le=10, allow_inf_nan=False)
+    vector: MovementVector | None = None
+    escape: bool | None = None
+
+    @model_validator(mode="after")
+    def validate_vector(self):
+        if self.direction == "vector":
+            if self.vector is None or self.escape is None:
+                raise ValueError("Vector movement requires a vector and an escape flag")
+            if self.vector.x == 0 and self.vector.y == 0:
+                raise ValueError("Movement vector must be nonzero")
+        else:
+            if "vector" in self.model_fields_set or "escape" in self.model_fields_set:
+                raise ValueError("Radial movement cannot include vector or escape fields")
+        return self
 
 
 class Organism(BaseModel):

@@ -67,7 +67,16 @@ async def stream(websocket: WebSocket):
                     movement = Movement.model_validate_json(command)
                     if config.boundary != "circle":
                         raise ValueError("Directed trajectories require a circular arena")
-                    await worker.movement(movement.direction == "outward", movement.speed_multiplier)
+                    if movement.direction == "vector":
+                        if config.simulation != "hexapod":
+                            raise ValueError("Vector movement requires the hexapod simulation")
+                        await worker.steer_vector(
+                            movement.vector.x, movement.vector.y,
+                            movement.escape, movement.speed_multiplier,
+                        )
+
+                    else:
+                        await worker.movement(movement.direction == "outward", movement.speed_multiplier)
                     continue
 
                 if command in {"outward", "outward_normal", "inward", "inward_fast"}:

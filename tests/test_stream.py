@@ -38,7 +38,7 @@ while True:
         assert 1 <= output_size <= size
         print('READY', flush=True)
         continue
-    if command == b'm':
+    if command in (b'm', b'v'):
         sys.stdin.buffer.readline()
         sys.stdout.buffer.write(b'READY\\n')
         sys.stdout.buffer.flush()
@@ -63,6 +63,46 @@ while True:
 
 
 class StreamTests(unittest.IsolatedAsyncioTestCase):
+    async def test_vector_steering_keeps_frames_aligned_and_rejects_other_backends(self):
+        launch = asyncio.create_subprocess_exec
+        process_commands = []
+
+        async def worker(*args, **kwargs):
+            process = await launch(sys.executable, '-u', '-c', WORKER, *args[1:], **kwargs)
+            original = process.stdin.write
+
+            def write(data):
+                process_commands.append(data)
+                original(data)
+
+            process.stdin.write = write
+            return process
+
+        movement = {'action': 'movement', 'direction': 'vector', 'vector': {'x': -.6, 'y': .8},
+                    'escape': True, 'speed_multiplier': 1.5}
+        with patch('lenia.server.worker.asyncio.create_subprocess_exec', worker):
+            async with connect(self.url) as viewer:
+                await viewer.send(json.dumps({**default_config(), 'size': 256, 'output_size': 120,
+                                             'organisms': [{'type': 528}]}))
+                self.assertEqual(json.loads(await viewer.recv())['status'], 'started')
+                for command in (movement, {**movement, 'vector': {'x': 1, 'y': 0}},
+                                {**movement, 'escape': False},
+                                {'action': 'movement', 'direction': 'inward', 'speed_multiplier': 1.0}):
+                    await viewer.send(json.dumps(command))
+                    await viewer.send('next')
+                    image = Image.open(io.BytesIO(await asyncio.wait_for(viewer.recv(), 5)))
+                    self.assertEqual(image.size, (120, 120))
+                await viewer.send('stop')
+                self.assertEqual(json.loads(await viewer.recv())['status'], 'stopped')
+            self.assertIn(b'v -0.6 0.8 1 1.5\n', process_commands)
+            self.assertIn(b'v 1.0 0.0 1 1.5\n', process_commands)
+            self.assertIn(b'v -0.6 0.8 0 1.5\n', process_commands)
+            async with connect(self.url) as viewer:
+                await viewer.send(json.dumps({'action': 'start', 'boundary': 'circle', 'organisms': [{'type': 0}]}))
+                self.assertEqual(json.loads(await viewer.recv())['status'], 'started')
+                await viewer.send(json.dumps(movement))
+                self.assertIn('hexapod', json.loads(await viewer.recv())['error'])
+
     async def asyncSetUp(self):
         # Fake native workers need a working directory, not a CUDA build.
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
