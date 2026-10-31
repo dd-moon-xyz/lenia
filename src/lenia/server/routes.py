@@ -96,7 +96,15 @@ async def stream(websocket: WebSocket):
                         "Send 'next' for a frame, a movement JSON object to set direction and speed, 'outward', 'outward_normal', 'inward', or 'inward_fast' to steer organisms, or 'stop' to end the simulation"
                     )
 
-                await websocket.send_bytes(await worker.frame())
+                frame = await worker.frame()
+                if config.population_updates and config.simulation == "hexapod":
+                    await websocket.send_json({
+                        "status": "population",
+                        "alive": sum(mass > 0.001 for mass in worker.worker.masses),
+                        "total": len(config.organisms),
+                    })
+
+                await websocket.send_bytes(frame)
     except WebSocketDisconnect as error:
         reason = f"client disconnected (code {error.code})"
     except (

@@ -57,6 +57,7 @@ namespace {
         if (index >= count) return;
         Walker& w = walkers[index];
         w.previous = w.position;
+        if (w.health <= 0.f) return;
         int steps = max(1, static_cast<int>(ceilf(dt * 240.f)));
         float interval = dt / steps;
         for (int step = 0; step < steps; ++step) {
@@ -68,8 +69,11 @@ namespace {
             float2 travel = make_float2(cosf(desired), sinf(desired));
             float distance = norm(radial);
             float projection = travel.x * radial.x + travel.y * radial.y;
-            // Keep the walker at the boundary until inward movement resumes.
-            if (!preview && outward && distance * w.zoom >= boundary - 1e-4f) continue;
+            // Sensor escape kills walkers at the visible circle edge.
+            if (!preview && outward && distance * w.zoom >= size * .5f) {
+                w.health = 0.f;
+                return;
+            }
             if (!preview && !outward && distance * w.zoom >= boundary && projection > 0.f) {
                 float2 reflected = sub(travel, mul(radial, 2.f * projection / (distance * distance)));
                 w.trajectory = atan2f(reflected.y, reflected.x);
@@ -82,11 +86,9 @@ namespace {
             float alignment = fmaxf(0.f, cosf(turn));
             float speed = 48.f * w.health * w.health * alignment * contacts / (2.f + contacts);
             float2 position = add(w.position, mul(direction, speed * interval));
-            if (!preview && outward) {
-                float2 nextRadial = sub(position, center);
-                float nextDistance = norm(nextRadial);
-                if (nextDistance * w.zoom > boundary)
-                    position = add(center, mul(nextRadial, boundary / (w.zoom * nextDistance)));
+            if (!preview && outward && norm(sub(position, center)) * w.zoom >= size * .5f) {
+                w.health = 0.f;
+                return;
             }
             float heading = w.heading + clip(turn, -interval, interval);
             bool supported = true;

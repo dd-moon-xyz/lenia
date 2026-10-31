@@ -48,6 +48,7 @@ class Start(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
     simulation: Literal["lenia", "hexapod"] = "lenia"
     action: Literal["start"]
+    population_updates: bool = False
     size: int = Field(default=512, ge=256, le=1024)
     output_size: int | None = Field(default=None, ge=1, le=1024)
     fps: int = Field(default=20, ge=1, le=60)
